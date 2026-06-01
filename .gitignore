@@ -1,0 +1,34 @@
+# Dependencias Node.js
+node_modules/
+npm-debug.log*
+yarn-error.log
+
+# Compilación NestJS / TypeScript
+dist/
+build/
+*.tsbuildinfo
+
+# Entornos y Secretos
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Infraestructura Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+.terraform.tfstate.lock.info
+
+# IDEs
+.vscode/
+.idea/
+.DS_Store
+
+# Logs y Testing
+logs/
+*.log
+coverage/
+.nyc_output/
