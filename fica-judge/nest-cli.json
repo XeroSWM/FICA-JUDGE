@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json.schemastore.org/nest-cli",
+  "collection": "@nestjs/schematics",
+  "sourceRoot": "apps/fica-judge/src",
+  "compilerOptions": {
+    "deleteOutDir": true,
+    "webpack": true,
+    "tsConfigPath": "apps/fica-judge/tsconfig.app.json"
+  },
+  "monorepo": true,
+  "root": "apps/fica-judge",
+  "projects": {
+    "api-gateway": {
+      "type": "application",
+      "root": "apps/api-gateway",
+      "entryFile": "main",
+      "sourceRoot": "apps/api-gateway/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/api-gateway/tsconfig.app.json"
+      }
+    },
+    "fica-judge": {
+      "type": "application",
+      "root": "apps/fica-judge",
+      "entryFile": "main",
+      "sourceRoot": "apps/fica-judge/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/fica-judge/tsconfig.app.json"
+      }
+    },
+    "iam-service": {
+      "type": "application",
+      "root": "apps/iam-service",
+      "entryFile": "main",
+      "sourceRoot": "apps/iam-service/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/iam-service/tsconfig.app.json"
+      }
+    },
+    "problem-catalog-service": {
+      "type": "application",
+      "root": "apps/problem-catalog-service",
+      "entryFile": "main",
+      "sourceRoot": "apps/problem-catalog-service/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/problem-catalog-service/tsconfig.app.json"
+      }
+    },
+    "shared-contracts": {
+      "type": "library",
+      "root": "libs/shared-contracts",
+      "entryFile": "index",
+      "sourceRoot": "libs/shared-contracts/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/shared-contracts/tsconfig.lib.json"
+      }
+    }
+  }
+}

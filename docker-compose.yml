@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  # ==========================================
+  # BROKER DE MENSAJERÍA (EDA)
+  # ==========================================
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: fica_rabbitmq
+    ports:
+      - "5672:5672"   # Puerto de conexión AMQP
+      - "15672:15672" # Interfaz de administración web
+    environment:
+      RABBITMQ_DEFAULT_USER: fica_admin
+      RABBITMQ_DEFAULT_PASS: fica_secret
+    networks:
+      - fica_network
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================
+  # BASES DE DATOS FASE 1
+  # ==========================================
+  iam-db:
+    image: postgres:15-alpine
+    container_name: fica_iam_db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: iam_user
+      POSTGRES_PASSWORD: iam_password
+      POSTGRES_DB: iam_db
+    volumes:
+      - iam_db_data:/var/lib/postgresql/data
+    networks:
+      - fica_network
+
+  problem-db:
+    image: mongo:6
+    container_name: fica_problem_db
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: mongo_admin
+      MONGO_INITDB_ROOT_PASSWORD: mongo_secret
+      MONGO_INITDB_DATABASE: problem_db
+    volumes:
+      - problem_db_data:/data/db
+    networks:
+      - fica_network
+
+  session-db:
+    image: redis:7-alpine
+    container_name: fica_session_db
+    ports:
+      - "6379:6379"
+    networks:
+      - fica_network
+
+volumes:
+  iam_db_data:
+  problem_db_data:
+
+networks:
+  fica_network:
+    driver: bridge
