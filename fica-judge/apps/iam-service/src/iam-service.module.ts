@@ -2,6 +2,11 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CqrsModule } from '@nestjs/cqrs';
 import { User } from './domain/entities/user.entity';
+import { IamController } from './infrastructure/controllers/iam.controller';
+import { RegisterUserHandler } from './application/commands/register-user.handler';
+
+// Agrupamos los handlers por si a futuro tenemos más (Login, Delete, etc.)
+const CommandHandlers = [RegisterUserHandler];
 
 @Module({
   imports: [
@@ -13,12 +18,12 @@ import { User } from './domain/entities/user.entity';
       username: 'iam_user',
       password: 'iam_password',
       database: 'iam_db',
-      entities: [User], // <-- Registramos la entidad explícitamente aquí
+      entities: [User],
       synchronize: true,
     }),
-    TypeOrmModule.forFeature([User]), // <-- Y la preparamos para usarla en los repositorios
+    TypeOrmModule.forFeature([User]),
   ],
-  controllers: [], // Vacío por ahora, los crearemos en infrastructure/
-  providers: [],
+  controllers: [IamController],
+  providers: [...CommandHandlers],
 })
 export class IamServiceModule {}
