@@ -57,7 +57,15 @@ resource "aws_launch_template" "fica_lt" {
               apt-get install -y docker.io
               systemctl start docker
               systemctl enable docker
-              docker run -d -p 3001:3001 --name fica-iam-service --restart unless-stopped xxavyx38/fica-iam-service:latest
+              
+              # Terraform inyectará dinámicamente la URL secreta de RDS aquí
+              docker run -d -p 3001:3001 --name fica-iam-service --restart unless-stopped \
+                -e DB_HOST=${aws_db_instance.fica_postgres.address} \
+                -e DB_PORT=5432 \
+                -e DB_USERNAME=${var.db_username} \
+                -e DB_PASSWORD=${var.db_password} \
+                -e DB_NAME=${var.db_name} \
+                xxavyx38/fica-iam-service:latest
               EOF
   )
 
