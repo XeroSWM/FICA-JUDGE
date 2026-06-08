@@ -14,6 +14,9 @@ resource "aws_lb" "fica_alb" {
   load_balancer_type = "application"
   security_groups    = [aws_security_group.fica_sg.id]
   subnets            = [aws_subnet.fica_subnet_a.id, aws_subnet.fica_subnet_b.id]
+  tags = {
+    Name = "fica-judge-alb-qa"
+  }
 }
 
 resource "aws_lb_target_group" "fica_tg" {
@@ -54,13 +57,16 @@ resource "aws_launch_template" "fica_lt" {
               apt-get install -y docker.io
               systemctl start docker
               systemctl enable docker
-              # RECUERDA CAMBIAR TU USUARIO AQUÍ:
-              docker run -d -p 3001:3001 --name fica-iam-service --restart unless-stopped TU_USUARIO_DOCKERHUB/fica-iam-service:latest
+              docker run -d -p 3001:3001 --name fica-iam-service --restart unless-stopped xxavyx38/fica-iam-service:latest
               EOF
   )
+
+  tags = {
+    Name = "fica-judge-lt-qa"
+  }
 }
 
-# 3. Grupo de Autoescalado (HA)
+# 3. Grupo de Autoescalado (HA) con propagación de nombres activada
 resource "aws_autoscaling_group" "fica_asg" {
   name                = "fica-judge-asg-qa"
   desired_capacity    = 2
@@ -72,6 +78,19 @@ resource "aws_autoscaling_group" "fica_asg" {
   launch_template {
     id      = aws_launch_template.fica_lt.id
     version = "$Latest"
+  }
+
+  # Forzar a la fábrica del ASG a nombrar las instancias en el despliegue
+  tag {
+    key                 = "Name"
+    value               = "fica-judge-node-qa"
+    propagate_at_launch = true
+  }
+
+  tag {
+    key                 = "Project"
+    value               = "FICA-JUDGE"
+    propagate_at_launch = true
   }
 }
 
