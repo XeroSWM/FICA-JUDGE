@@ -20,10 +20,15 @@ function App() {
     e.preventDefault();
     setMessage(null);
 
+    // 1. Leer la variable de entorno configurada en Vite
+    // Si no la encuentra, usará localhost por defecto para desarrollo local
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
     try {
       if (!isLogin) {
-        // Ejecutar flujo de REGISTRO hacia el IAM Service (Puerto 3001)
-        const response = await axios.post('http://localhost:3001/auth/register', formData);
+        // 2. Usar la variable dinámica en lugar de la dirección quemada
+        const response = await axios.post(`${API_URL}/auth/register`, formData);
+        
         setMessage({ text: response.data.message || 'Registro exitoso. Ahora puedes iniciar sesión.', type: 'success' });
         setIsLogin(true); // Volver al login tras registrar
       } else {
@@ -112,7 +117,7 @@ function App() {
           <span className="text-muted" style={{ fontSize: '0.85rem' }}>
             {isLogin ? '¿No tienes cuenta? ' : '¿Ya tienes cuenta? '}
           </span>
-          <span className="text-brand fw-bold" onClick={() => setIsLogin(!isLogin)}>
+          <span className="text-brand fw-bold" style={{ cursor: 'pointer' }} onClick={() => setIsLogin(!isLogin)}>
             {isLogin ? 'Registrarse aquí' : 'Iniciar sesión'}
           </span>
         </div>
