@@ -1,0 +1,56 @@
+name: Despliegue FICA-JUDGE (QA)
+
+on:
+  push:
+    branches:
+      - qa
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  build-and-test:
+    name: Integración Continua (CI)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v3
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Instalar dependencias del Monorepo
+        run: npm ci
+
+      - name: Compilar Frontend y Backend
+        run: npm run build --workspaces --if-present
+
+  terraform-deploy:
+    name: Despliegue de Infraestructura (CD)
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v3
+
+      - name: Configurar credenciales de AWS
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Configurar Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.5.0
+
+      - name: Terraform Init
+        working-directory: ./terraform/environments/qa
+        run: terraform init
+
+      - name: Terraform Apply
+        working-directory: ./terraform/environments/qa
+        run: terraform apply -auto-approve
