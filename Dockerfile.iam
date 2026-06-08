@@ -1,0 +1,22 @@
+# Etapa 1: Construcción
+FROM node:18-alpine AS builder
+WORKDIR /usr/src/app
+# Copiar dependencias primero para aprovechar la caché de Docker
+COPY package*.json ./
+RUN npm ci
+# Copiar el resto del código y compilar
+COPY . .
+RUN npm run build iam-service
+
+# Etapa 2: Producción
+FROM node:18-alpine
+WORKDIR /usr/src/app
+# Instalar solo dependencias de producción
+COPY package*.json ./
+RUN npm ci --omit=dev
+# Copiar los binarios compilados de la etapa anterior
+COPY --from=builder /usr/src/app/dist ./dist
+# Exponer el puerto de tu API
+EXPOSE 3001
+# Iniciar el microservicio
+CMD ["node", "dist/apps/iam-service/main"]
