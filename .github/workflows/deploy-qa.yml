@@ -1,0 +1,46 @@
+name: Entrega Continua FICA-JUDGE (Docker Hub)
+
+on:
+  push:
+    branches:
+      - qa
+
+jobs:
+  # FASE 1: Integración Continua
+  build-and-test:
+    name: Validar Código (CI)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./fica-judge # <-- CRÍTICO: Le dice a GitHub que entre a la subcarpeta
+    steps:
+      - uses: actions/checkout@v4 # <-- Actualizado a v4 para eliminar el warning
+      
+      - uses: actions/setup-node@v4 # <-- Actualizado a v4
+        with:
+          node-version: '20'
+          
+      - run: npm install
+      - run: npm run build iam-service
+
+  # FASE 2: Publicar en Docker Hub
+  docker-publish:
+    name: Construir y Subir a Docker Hub
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4 # <-- Actualizado a v4
+
+      - name: Iniciar sesión en Docker Hub
+        uses: docker/login-action@v3 # <-- Actualizado a v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Construir y Empujar IAM Service
+        uses: docker/build-push-action@v5 # <-- Actualizado a v5
+        with:
+          context: ./fica-judge # <-- CRÍTICO: Le dice a Docker dónde está el código
+          file: ./fica-judge/Dockerfile.iam # <-- Ruta exacta de tu Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/fica-iam-service:latest

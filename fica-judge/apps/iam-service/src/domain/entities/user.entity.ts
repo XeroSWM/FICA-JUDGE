@@ -9,33 +9,33 @@ export enum UserRole {
 @Entity('users')
 export class User {
   @PrimaryGeneratedColumn('uuid')
-  id!: string; // <-- Agregamos !
+  id!: string;
 
   @Column({ unique: true })
-  email!: string; // <-- Agregamos !
+  email!: string;
 
   @Column()
-  passwordHash!: string; // <-- Agregamos !
+  passwordHash!: string;
 
   @Column()
-  firstName!: string; // <-- Agregamos !
+  firstName!: string;
 
   @Column()
-  lastName!: string; // <-- Agregamos !
+  lastName!: string;
 
   @Column({
     type: 'enum',
     enum: UserRole,
     default: UserRole.STUDENT,
   })
-  role!: UserRole; // <-- Agregamos !
+  role!: UserRole;
 
   @Column({ default: true })
-  isActive!: boolean; // <-- Agregamos !
+  isActive!: boolean;
 
   @CreateDateColumn()
-  createdAt!: Date; // <-- Agregamos !
+  createdAt!: Date;
 
   @UpdateDateColumn()
-  updatedAt!: Date; // <-- Agregamos !
+  updatedAt!: Date;
 }
