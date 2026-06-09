@@ -18,7 +18,7 @@ const ProblemDetail: React.FC = () => {
           setCode(response.data.templates[0].starterCode);
         }
       } catch (error) {
-        console.warn("No se pudo obtener por ID, intentando buscar en la lista completa...");
+        console.warn("No se pudo obtener por ID, buscando en la lista completa...");
         try {
           const fallbackRes = await axios.get(`http://localhost:3002/problems`);
           const found = fallbackRes.data.find((p: any) => p._id === id);
@@ -41,11 +41,10 @@ const ProblemDetail: React.FC = () => {
   if (loading) return <div className="p-4" style={{ color: '#8b949e' }}>Cargando entorno de evaluación...</div>;
   if (!problem) return <div className="p-4" style={{ color: '#f85149' }}>Problema no encontrado. Revisa si el ID es correcto.</div>;
 
-  // LÓGICA DINÁMICA: Obtener el nombre de la imagen Docker basado en el lenguaje del problema
   const getDockerImageName = () => {
     if (problem.templates && problem.templates.length > 0) {
       const lang = problem.templates[0].language.toLowerCase();
-      return `fica-comp-${lang}.v2`; // Ej: fica-comp-python.v2 o fica-comp-cpp.v2
+      return `fica-comp-${lang}.v2`;
     }
     return 'fica-comp-default.v2';
   };
@@ -67,7 +66,9 @@ const ProblemDetail: React.FC = () => {
       </div>
 
       <div className="row g-4">
-        {/* COLUMNA IZQUIERDA: ENUNCIADO */}
+        {/* ========================================================== */}
+        {/* COLUMNA IZQUIERDA: ENUNCIADO                               */}
+        {/* ========================================================== */}
         <div className="col-lg-5">
           <div className="d-flex mb-3" style={{ borderBottom: '1px solid #30363d' }}>
             <div className="px-3 py-2 fw-bold" style={{ borderBottom: '2px solid #3fb950', color: '#3fb950', fontSize: '0.85rem' }}>
@@ -80,14 +81,15 @@ const ProblemDetail: React.FC = () => {
 
           <div className="d-flex justify-content-between align-items-center mb-3">
             <h4 className="fw-bold text-white mb-0">{problem.title}</h4>
-            <span className="fw-bold" style={{ fontSize: '0.7rem', color: '#3fb950' }}>{problem.difficulty}</span>
+            <span className="fw-bold" style={{ fontSize: '0.7rem', color: '#f85149' }}>
+              {problem.difficulty}
+            </span>
           </div>
 
           <p className="mb-4" style={{ color: '#8b949e', fontSize: '0.9rem', lineHeight: '1.6' }}>
             {problem.description}
           </p>
 
-          {/* LÍMITES DINÁMICOS */}
           <div className="d-flex p-3 mb-4 rounded" style={{ backgroundColor: '#161b22', border: '1px solid #30363d' }}>
             <div className="w-50">
               <div style={{ fontSize: '0.65rem', color: '#8b949e', letterSpacing: '1px', fontWeight: 'bold' }}>LÍMITE COMPUTACIONAL</div>
@@ -99,22 +101,27 @@ const ProblemDetail: React.FC = () => {
             </div>
           </div>
 
-          {/* RESTRICCIONES DINÁMICAS */}
+          {/* ========================================================== */}
+          {/* RESTRICCIONES ACADÉMICAS DINÁMICAS                         */}
+          {/* ========================================================== */}
           <h6 className="fw-bold mb-2" style={{ fontSize: '0.85rem', color: '#8b949e' }}>RESTRICCIONES ACADÉMICAS</h6>
           <ul className="ps-3 mb-5" style={{ color: '#8b949e', fontSize: '0.85rem' }}>
-            {/* Si tu backend manda un arreglo de 'constraints', las mapea aquí */}
+            
+            {/* Iteramos sobre el arreglo de 'constraints' que viene de Mongo */}
             {problem.constraints && problem.constraints.length > 0 ? (
-              problem.constraints.map((restriccion: string, idx: number) => (
-                <li key={idx}>{restriccion}</li>
+              problem.constraints.map((restriccion: string, index: number) => (
+                <li key={index} className="mb-1">{restriccion}</li>
               ))
             ) : (
-              /* Si no mandas 'constraints', pone este texto por defecto pero usando el timeLimit real */
-              <li>Optimiza tu algoritmo para evitar redundancia en ciclos.</li>
+              <li className="mb-1">No hay restricciones adicionales registradas.</li>
             )}
-            <li>El tiempo máximo aceptable para responder es {(problem.timeLimit / 1000).toFixed(1)} segundos.</li>
+            
+            {/* El límite de tiempo siempre se calcula automáticamente */}
+            <li className="mb-1 text-white">
+              El tiempo máximo aceptable para responder es {(problem.timeLimit / 1000).toFixed(1)} segundos.
+            </li>
           </ul>
 
-          {/* DOCKER IMAGE DINÁMICO */}
           <div className="mt-5 pt-3" style={{ borderTop: '1px solid #30363d', fontSize: '0.75rem' }}>
             <div className="fw-bold text-white mb-1">FICA-JUDGE SANDBOX VIRTUAL</div>
             <div className="d-flex justify-content-between" style={{ color: '#8b949e' }}>
@@ -124,7 +131,9 @@ const ProblemDetail: React.FC = () => {
           </div>
         </div>
 
-        {/* COLUMNA DERECHA: EDITOR Y CONSOLA */}
+        {/* ========================================================== */}
+        {/* COLUMNA DERECHA: EDITOR Y CONSOLA                          */}
+        {/* ========================================================== */}
         <div className="col-lg-7 d-flex flex-column">
           
           <div className="card flex-grow-1 mb-3" style={{ backgroundColor: '#161b22', border: '1px solid #30363d', borderRadius: '6px' }}>
@@ -134,7 +143,7 @@ const ProblemDetail: React.FC = () => {
                 {problem.templates && problem.templates.map((tpl: any, i: number) => (
                   <option key={i} value={tpl.language}>{tpl.language.toUpperCase()}</option>
                 ))}
-                {!problem.templates && <option>Python</option>}
+                {!problem.templates && <option>PYTHON</option>}
               </select>
             </div>
             

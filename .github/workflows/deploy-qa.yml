@@ -1,9 +1,13 @@
-name: Entrega Continua FICA-JUDGE (Docker Hub)
+name: Entrega Continua Problem Catalog (Docker Hub)
 
 on:
   push:
     branches:
       - qa
+    paths:
+      # Opcional: Esto hace que el pipeline solo se ejecute si detecta cambios 
+      # dentro de la carpeta del catálogo, ahorrando minutos de GitHub Actions.
+      - 'fica-judge/apps/problem-catalog-service/**'
 
 jobs:
   # FASE 1: Integración Continua
@@ -12,35 +16,39 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./fica-judge # <-- CRÍTICO: Le dice a GitHub que entre a la subcarpeta
+        working-directory: ./fica-judge # <-- Entra a la raíz de tu monorepo
     steps:
-      - uses: actions/checkout@v4 # <-- Actualizado a v4 para eliminar el warning
+      - uses: actions/checkout@v4
       
-      - uses: actions/setup-node@v4 # <-- Actualizado a v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '20'
           
       - run: npm install
-      - run: npm run build iam-service
+      # <-- Validamos específicamente que el catálogo compile sin errores
+      - run: npm run build problem-catalog-service 
 
   # FASE 2: Publicar en Docker Hub
   docker-publish:
     name: Construir y Subir a Docker Hub
-    needs: build-and-test
+    needs: build-and-test # <-- Garantiza que solo se suba si la fase 1 fue exitosa
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4 # <-- Actualizado a v4
+      - uses: actions/checkout@v4
 
       - name: Iniciar sesión en Docker Hub
-        uses: docker/login-action@v3 # <-- Actualizado a v3
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Construir y Empujar IAM Service
-        uses: docker/build-push-action@v5 # <-- Actualizado a v5
+      - name: Construir y Empujar Problem Catalog
+        uses: docker/build-push-action@v5
         with:
-          context: ./fica-judge # <-- CRÍTICO: Le dice a Docker dónde está el código
-          file: ./fica-judge/Dockerfile.iam # <-- Ruta exacta de tu Dockerfile
+          context: ./fica-judge # <-- El contexto sigue siendo la raíz del monorepo
+          # <-- Ruta exacta hacia el Dockerfile del catálogo
+          file: ./fica-judge/apps/problem-catalog-service/Dockerfile 
           push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/fica-iam-service:latest
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/problem-catalog-service:latest
+            ${{ secrets.DOCKER_USERNAME }}/problem-catalog-service:v1
