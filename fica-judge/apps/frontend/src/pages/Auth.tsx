@@ -53,7 +53,7 @@ const Auth: React.FC = () => {
         });
 
         // 2. MAGIA: Redirigimos al usuario a la página principal (Dashboard)
-        navigate('/dashboard');
+        navigate('/inicio');
       }
     } catch (error: unknown) {
       const errorMessage =
