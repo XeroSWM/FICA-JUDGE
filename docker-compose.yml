@@ -38,6 +38,8 @@ services:
     networks:
       - fica_network
 
+  
+
   problem-db:
     image: mongo:6
     container_name: fica_problem_db
