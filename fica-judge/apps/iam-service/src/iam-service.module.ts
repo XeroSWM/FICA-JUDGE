@@ -5,8 +5,10 @@ import { User } from './domain/entities/user.entity';
 import { IamController } from './infrastructure/controllers/iam.controller';
 import { HealthController } from './infrastructure/controllers/health.controller';
 import { RegisterUserHandler } from './application/commands/register-user.handler';
+import { LoginUserHandler } from './application/commands/login-user.handler'; // <-- 1. IMPORTAR AQUÍ
 
-const CommandHandlers = [RegisterUserHandler];
+// <-- 2. AGREGAR AL ARREGLO AQUÍ
+const CommandHandlers = [RegisterUserHandler, LoginUserHandler]; 
 
 @Module({
   imports: [

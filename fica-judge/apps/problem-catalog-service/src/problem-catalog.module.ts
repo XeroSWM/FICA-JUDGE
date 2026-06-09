@@ -2,23 +2,23 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { CqrsModule } from '@nestjs/cqrs';
 
-// 1. Dominio (Esquemas)
+// 1. Dominio
 import { Problem, ProblemSchema } from './domain/schemas/problem.schema';
 
-// 2. Infraestructura (Controladores)
+// 2. Infraestructura
 import { ProblemController } from './infrastructure/controllers/problem.controller';
 
-// 3. Aplicación (Casos de Uso / Handlers)
+// 3. Aplicación (Handlers)
 import { CreateProblemHandler } from './application/commands/create-problem.handler';
+import { GetProblemsHandler } from './application/queries/get-problems.handler'; // <--- IMPORTA AQUÍ
 
-// Agrupamos los handlers para mantener el módulo limpio cuando tu aplicación crezca
+// Agrupamos
 const CommandHandlers = [CreateProblemHandler];
+const QueryHandlers = [GetProblemsHandler]; // <--- NUEVO ARREGLO DE QUERIES
 
 @Module({
   imports: [
     CqrsModule,
-    
-    // Conexión dinámica a MongoDB (Compatible con tu docker-compose local y el futuro AWS)
     MongooseModule.forRootAsync({
       useFactory: () => {
         const host = process.env.MONGO_HOST || 'localhost';
@@ -26,18 +26,17 @@ const CommandHandlers = [CreateProblemHandler];
         const user = process.env.MONGO_USER || 'mongo_admin';
         const pass = process.env.MONGO_PASSWORD || 'mongo_secret';
         const db   = process.env.MONGO_DB || 'problem_db';
-
         return {
-          // Cadena de conexión con autenticación
           uri: `mongodb://${user}:${pass}@${host}:${port}/${db}?authSource=admin`,
         };
       },
     }),
-    
-    // Registramos el esquema del problema en el contexto de la base de datos
     MongooseModule.forFeature([{ name: Problem.name, schema: ProblemSchema }]),
   ],
-  controllers: [ProblemController], // Recibe las peticiones HTTP
-  providers: [...CommandHandlers],  // Ejecuta la lógica de negocio
+  controllers: [ProblemController],
+  providers: [
+    ...CommandHandlers, 
+    ...QueryHandlers // <--- AGREGADO AQUÍ
+  ],
 })
 export class ProblemCatalogModule {}
