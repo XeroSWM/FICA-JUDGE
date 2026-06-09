@@ -2,7 +2,7 @@
 const Dashboard = () => {
   return (
     <div className="text-white">
-      <h1>Hola de nuevo, Jefferson!</h1>
+      <h1>Hola de nuevo</h1>
       {/* Aquí pones las tarjetas o el contenido que tenías en el centro */}
     </div>
   );

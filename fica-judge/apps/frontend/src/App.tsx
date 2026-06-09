@@ -1,10 +1,11 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Auth from './pages/Auth';
+import MainLayout from './pages/MainLayout';
+import Inicio from './pages/Inicio';
 import Dashboard from './pages/Dashboard';
 import ProblemList from './pages/ProblemList';
+import ProblemDetail from './pages/ProblemDetail'; // <-- IMPORTAMOS LA NUEVA VISTA
 
-// Componente para proteger las rutas privadas: 
-// Si no hay token en localStorage, redirige al Login (/)
 const PrivateRoute = ({ children }: { children: JSX.Element }) => {
   const token = localStorage.getItem('fj_token');
   return token ? children : <Navigate to="/" />;
@@ -14,28 +15,16 @@ function App() {
   return (
     <Router>
       <Routes>
-        {/* Ruta Pública: Login */}
         <Route path="/" element={<Auth />} />
-
-        {/* Ruta Protegida: Dashboard */}
-        <Route 
-          path="/dashboard" 
-          element={
-            <PrivateRoute>
-              <Dashboard />
-            </PrivateRoute>
-          } 
-        />
-
-        {/* Ruta Protegida: Lista de Problemas */}
-        <Route 
-          path="/problems" 
-          element={
-            <PrivateRoute>
-              <ProblemList />
-            </PrivateRoute>
-          } 
-        />
+        
+        <Route element={<PrivateRoute><MainLayout /></PrivateRoute>}>
+          <Route path="/inicio" element={<Inicio />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/problems" element={<ProblemList />} />
+          
+          {/* NUEVA RUTA DINÁMICA PARA EL DETALLE DEL PROBLEMA */}
+          <Route path="/problems/:id" element={<ProblemDetail />} />
+        </Route>
       </Routes>
     </Router>
   );
