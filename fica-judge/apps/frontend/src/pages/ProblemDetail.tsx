@@ -2,17 +2,37 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
+interface ProblemTemplate {
+  language: string;
+  starterCode: string;
+}
+
+interface Problem {
+  _id?: string;
+  title: string;
+  difficulty: string;
+  description: string;
+  timeLimit: number;
+  memoryLimit: number;
+  constraints?: string[];
+  templates?: ProblemTemplate[];
+}
+
 const ProblemDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [problem, setProblem] = useState<any>(null);
+  const [problem, setProblem] = useState<Problem | null>(null);
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchProblem = async () => {
+      // 👇 DEFINIMOS LA URL BASE DINÁMICA AQUÍ
+      const apiUrl = import.meta.env.VITE_CATALOG_API_URL || 'http://localhost:3002';
+      
       try {
-        const response = await axios.get(`http://localhost:3002/problems/${id}`);
+        // Usamos apiUrl para la petición principal
+        const response = await axios.get(`${apiUrl}/problems/${id}`);
         setProblem(response.data);
         if (response.data.templates && response.data.templates.length > 0) {
           setCode(response.data.templates[0].starterCode);
@@ -20,7 +40,8 @@ const ProblemDetail: React.FC = () => {
       } catch (error) {
         console.warn("No se pudo obtener por ID, buscando en la lista completa...");
         try {
-          const fallbackRes = await axios.get(`http://localhost:3002/problems`);
+          // Usamos apiUrl también para el fallback
+          const fallbackRes = await axios.get(`${apiUrl}/problems`);
           const found = fallbackRes.data.find((p: any) => p._id === id);
           if (found) {
             setProblem(found);

@@ -5,8 +5,9 @@ import Inicio from './pages/Inicio';
 import Dashboard from './pages/Dashboard';
 import ProblemList from './pages/ProblemList';
 import ProblemDetail from './pages/ProblemDetail'; // <-- IMPORTAMOS LA NUEVA VISTA
+import React from 'react';
 
-const PrivateRoute = ({ children }: { children: JSX.Element }) => {
+const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   const token = localStorage.getItem('fj_token');
   return token ? children : <Navigate to="/" />;
 };
