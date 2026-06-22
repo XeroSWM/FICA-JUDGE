@@ -1,3 +1,4 @@
+// src/domain/schemas/problem.schema.ts (o donde tengas tu esquema)
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 
@@ -28,6 +29,9 @@ export class Problem {
   @Prop({ type: [TestCase], default: [] }) testCases: TestCase[];
   @Prop({ type: [CodeTemplate], default: [] }) templates: CodeTemplate[]; // Plantillas inyectadas al editor
   @Prop({ type: [String], default: [] }) tags: string[];
+  
+  // NUEVO: Arreglo para las restricciones dinámicas del ejercicio (Constraints)
+  @Prop({ type: [String], default: [] }) constraints: string[];
 }
 
 export const ProblemSchema = SchemaFactory.createForClass(Problem);

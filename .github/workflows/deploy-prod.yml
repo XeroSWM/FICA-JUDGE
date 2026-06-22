@@ -3,7 +3,7 @@ name: Entrega Continua Problem Catalog (Docker Hub)
 on:
   push:
     branches:
-      - qa
+      - prod
     paths:
       # Opcional: Esto hace que el pipeline solo se ejecute si detecta cambios 
       # dentro de la carpeta del catálogo, ahorrando minutos de GitHub Actions.

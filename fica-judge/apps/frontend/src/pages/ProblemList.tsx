@@ -20,7 +20,10 @@ const ProblemList: React.FC = () => {
   useEffect(() => {
     const fetchProblems = async () => {
       try {
-        const response = await axios.get('http://localhost:3002/problems');
+        // 👇 ESTE ES EL CAMBIO CLAVE: Llamamos a la variable de entorno
+        const apiUrl = import.meta.env.VITE_CATALOG_API_URL || 'http://localhost:3002';
+        const response = await axios.get(`${apiUrl}/problems`);
+        
         setProblems(response.data);
       } catch (error) {
         console.error("Error al cargar problemas:", error);
@@ -101,7 +104,6 @@ const ProblemList: React.FC = () => {
 
                 <h6 className="text-white fw-bold mb-2">{problem.title}</h6>
                 
-                {/* ESTO ARREGLA EL TEXTO INVISIBLE */}
                 <p className="mb-4" style={{ color: '#8b949e', fontSize: '0.8rem', lineHeight: '1.5', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
                   {problem.description}
                 </p>
