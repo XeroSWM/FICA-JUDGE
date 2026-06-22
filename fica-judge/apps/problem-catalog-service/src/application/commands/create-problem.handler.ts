@@ -15,12 +15,12 @@ export class CreateProblemHandler implements ICommandHandler<CreateProblemComman
       title: command.title,
       description: command.description,
       difficulty: command.difficulty,
-      timeLimit: command.timeLimit,       // <-- DEBE ESTAR
-      memoryLimit: command.memoryLimit,   // <-- DEBE ESTAR
+      timeLimit: command.timeLimit,       
+      memoryLimit: command.memoryLimit,  
       tags: command.tags,
       templates: command.templates,
       testCases: command.testCases,
-      constraints: command.constraints,   // <-- DEBE ESTAR
+      constraints: command.constraints, 
     });
     
     return await newProblem.save();
