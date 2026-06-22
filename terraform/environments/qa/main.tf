@@ -13,7 +13,7 @@ data "aws_ami" "ubuntu" {
 }
 
 # =================================================================
-# 1. DESPLIEGUE DEL IAM SERVICE
+# 1. DESPLIEGUE DEL IAM SERVICE (Con PostgreSQL)
 # =================================================================
 module "iam_service" {
   source = "../../modules/microservice"
@@ -30,14 +30,18 @@ module "iam_service" {
   app_port      = 3001
   docker_image  = "xxavyx38/fica-iam-service:latest"
   
-  # Configuración específica de su base de datos Postgres
+  # Interruptores de Base de Datos
+  requires_rds   = true
+  requires_mongo = false
+  
+  # Credenciales RDS
   db_name       = var.db_name
   db_username   = var.db_username
   db_password   = var.db_password
 }
 
 # =================================================================
-# 2. DESPLIEGUE DEL PROBLEM CATALOG SERVICE
+# 2. DESPLIEGUE DEL PROBLEM CATALOG SERVICE (Con DocumentDB/Mongo)
 # =================================================================
 module "catalog_service" {
   source = "../../modules/microservice"
@@ -54,7 +58,11 @@ module "catalog_service" {
   app_port      = 3002
   docker_image  = "xxavyx38/problem-catalog-service:latest"
   
-  # Configuración específica de su base de datos Postgres aislada
+  # Interruptores de Base de Datos (Apagamos RDS, Encendemos Mongo)
+  requires_rds   = false
+  requires_mongo = true
+  
+  # Credenciales DocumentDB (No usa db_name)
   db_name       = "ficacatalog_qa"
   db_username   = var.db_username
   db_password   = var.db_password
