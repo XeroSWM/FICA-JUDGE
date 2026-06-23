@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import ProblemList from './pages/ProblemList';
 import ProblemDetail from './pages/ProblemDetail'; // <-- IMPORTAMOS LA NUEVA VISTA
 import React from 'react';
+import CreateProblem from './components/CreateProblem';
 
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   const token = localStorage.getItem('fj_token');
@@ -22,7 +23,7 @@ function App() {
           <Route path="/inicio" element={<Inicio />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/problems" element={<ProblemList />} />
-          
+          <Route path="/problems/new" element={<CreateProblem />} />
           {/* NUEVA RUTA DINÁMICA PARA EL DETALLE DEL PROBLEMA */}
           <Route path="/problems/:id" element={<ProblemDetail />} />
         </Route>
