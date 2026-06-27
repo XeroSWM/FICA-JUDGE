@@ -20,7 +20,6 @@ const ProblemList: React.FC = () => {
   useEffect(() => {
     const fetchProblems = async () => {
       try {
-        // 👇 ESTE ES EL CAMBIO CLAVE: Llamamos a la variable de entorno
         const apiUrl = import.meta.env.VITE_CATALOG_API_URL || 'http://localhost:3002';
         const response = await axios.get(`${apiUrl}/problems`);
         
@@ -54,13 +53,24 @@ const ProblemList: React.FC = () => {
             Material de optimización calificado asíncronamente por nuestros evaluadores Docker.
           </p>
         </div>
-        <div style={{ width: '250px' }}>
-          <input 
-            type="text" 
-            className="form-control form-control-sm text-light" 
-            placeholder="🔍 Filtrar problemas..." 
-            style={{ backgroundColor: '#010409', borderColor: '#30363d' }}
-          />
+        
+        {/* Contenedor de Búsqueda y Botón */}
+        <div className="d-flex gap-2 align-items-center">
+          <div style={{ width: '250px' }}>
+            <input 
+              type="text" 
+              className="form-control form-control-sm text-light" 
+              placeholder="🔍 Filtrar problemas..." 
+              style={{ backgroundColor: '#010409', borderColor: '#30363d' }}
+            />
+          </div>
+          <button 
+            className="btn btn-sm text-white" 
+            style={{ backgroundColor: '#238636', fontWeight: 'bold' }}
+            onClick={() => navigate('/problems/new')}
+          >
+            + Crear Problema
+          </button>
         </div>
       </div>
 
