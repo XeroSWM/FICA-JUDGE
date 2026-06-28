@@ -25,22 +25,28 @@ const ProblemDetail: React.FC = () => {
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(true);
 
+  // ==========================================
+  // NUEVOS ESTADOS PARA EL MOTOR DE EVALUACIÓN
+  // ==========================================
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [terminalOutput, setTerminalOutput] = useState('> Presiona "Ejecutar Código" para compilar sobre tus casos o "Enviar Solución" para correr los pools de RabbitMQ.');
+  const [testResults, setTestResults] = useState<any[]>([]);
+  
+  // Estado para la Entrada Estándar en Caliente (Custom Input)
+  const [customInput, setCustomInput] = useState("3\n2 7 11\n9"); 
+
   useEffect(() => {
     const fetchProblem = async () => {
-      // 👇 DEFINIMOS LA URL BASE DINÁMICA AQUÍ
       const apiUrl = import.meta.env.VITE_CATALOG_API_URL || 'http://localhost:3002';
       
       try {
-        // Usamos apiUrl para la petición principal
         const response = await axios.get(`${apiUrl}/problems/${id}`);
         setProblem(response.data);
         if (response.data.templates && response.data.templates.length > 0) {
           setCode(response.data.templates[0].starterCode);
         }
       } catch (error) {
-        console.warn("No se pudo obtener por ID, buscando en la lista completa...");
         try {
-          // Usamos apiUrl también para el fallback
           const fallbackRes = await axios.get(`${apiUrl}/problems`);
           const found = fallbackRes.data.find((p: any) => p._id === id);
           if (found) {
@@ -58,6 +64,97 @@ const ProblemDetail: React.FC = () => {
     };
     fetchProblem();
   }, [id]);
+
+  // ==========================================
+  // LÓGICA MODO: "EJECUTAR CÓDIGO" (Síncrono)
+  // ==========================================
+  const handleRunCode = async () => {
+    setIsSubmitting(true);
+    setTestResults([]); // Limpiamos resultados anteriores
+    setTerminalOutput("> Compilando y ejecutando código en entorno seguro...");
+
+    try {
+      // Hacemos el POST directo a la nueva ruta /run
+      const response = await axios.post('http://localhost:3003/submissions/run', {
+        language: 'python',
+        sourceCode: code,
+        input: customInput // Enviamos lo que haya escrito el usuario en la cajita
+      });
+
+      setIsSubmitting(false);
+      
+      // Imprimimos la salida cruda de la consola
+      setTerminalOutput(`> Salida del programa:\n\n${response.data.output || '(Programa finalizado sin imprimir nada)'}`);
+
+    } catch (error) {
+      setIsSubmitting(false);
+      setTerminalOutput("> [ERROR] No se pudo conectar con el motor de evaluación.");
+    }
+  };
+
+  // ==========================================
+  // LÓGICA MODO: "ENVIAR SOLUCIÓN" (Asíncrono / RabbitMQ)
+  // ==========================================
+  const handleSubmitSolution = async () => {
+    if (!problem) return;
+    
+    setIsSubmitting(true);
+    setTestResults([]);
+    setTerminalOutput("> Empaquetando código y enviando a la cola de RabbitMQ...");
+
+    try {
+      // 1. Enviamos el código al Submission Service (Sin los testCases quemados)
+      const response = await axios.post('http://localhost:3003/submissions', {
+        studentId: 'user_jefferson', // En el futuro saldrá de tu AuthContext
+        problemId: problem._id || id,
+        language: 'python',
+        sourceCode: code
+      });
+
+      if (response.data.status === 'PENDING') {
+        const subId = response.data.submissionId;
+        setTerminalOutput(`> Código encolado (UUID: ${subId.split('-')[0]}...). Ejecutando en Sandbox...`);
+        // 2. Iniciamos el sondeo
+        pollSubmissionResult(subId);
+      }
+    } catch (error) {
+      console.error(error);
+      setTerminalOutput("> [ERROR] No se pudo conectar con el motor de evaluación (Puerto 3003).");
+      setIsSubmitting(false);
+    }
+  };
+
+  const pollSubmissionResult = (submissionId: string) => {
+    const pollInterval = setInterval(async () => {
+      try {
+        const res = await axios.get(`http://localhost:3003/submissions/${submissionId}`);
+        const data = res.data;
+
+        // Si el Worker ya guardó el resultado final en Postgres
+        if (data.status !== 'PENDING') {
+          clearInterval(pollInterval);
+          setIsSubmitting(false);
+          
+          if (data.status === 'ACCEPTED') {
+            setTerminalOutput(`> ✅ ¡Aceptado! Veredicto Final: ACCEPTED`);
+          } else if (data.status === 'WRONG_ANSWER') {
+            setTerminalOutput(`> ❌ Respuesta Incorrecta. Veredicto Final: WRONG_ANSWER`);
+          } else {
+            setTerminalOutput(`> ⚠️ Error en tiempo de ejecución. Veredicto Final: ${data.status}`);
+          }
+
+          // Guardamos los resultados detallados para mostrarlos en la UI
+          if (data.results) {
+            setTestResults(data.results);
+          }
+        }
+      } catch (error) {
+        clearInterval(pollInterval);
+        setTerminalOutput("> [ERROR] Falló la consulta de estado con la base de datos.");
+        setIsSubmitting(false);
+      }
+    }, 1000); // Preguntar cada 1 segundo
+  };
 
   if (loading) return <div className="p-4" style={{ color: '#8b949e' }}>Cargando entorno de evaluación...</div>;
   if (!problem) return <div className="p-4" style={{ color: '#f85149' }}>Problema no encontrado. Revisa si el ID es correcto.</div>;
@@ -87,9 +184,7 @@ const ProblemDetail: React.FC = () => {
       </div>
 
       <div className="row g-4">
-        {/* ========================================================== */}
-        {/* COLUMNA IZQUIERDA: ENUNCIADO                               */}
-        {/* ========================================================== */}
+        {/* COLUMNA IZQUIERDA: ENUNCIADO */}
         <div className="col-lg-5">
           <div className="d-flex mb-3" style={{ borderBottom: '1px solid #30363d' }}>
             <div className="px-3 py-2 fw-bold" style={{ borderBottom: '2px solid #3fb950', color: '#3fb950', fontSize: '0.85rem' }}>
@@ -107,7 +202,7 @@ const ProblemDetail: React.FC = () => {
             </span>
           </div>
 
-          <p className="mb-4" style={{ color: '#8b949e', fontSize: '0.9rem', lineHeight: '1.6' }}>
+          <p className="mb-4" style={{ color: '#8b949e', fontSize: '0.9rem', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
             {problem.description}
           </p>
 
@@ -122,13 +217,8 @@ const ProblemDetail: React.FC = () => {
             </div>
           </div>
 
-          {/* ========================================================== */}
-          {/* RESTRICCIONES ACADÉMICAS DINÁMICAS                         */}
-          {/* ========================================================== */}
           <h6 className="fw-bold mb-2" style={{ fontSize: '0.85rem', color: '#8b949e' }}>RESTRICCIONES ACADÉMICAS</h6>
           <ul className="ps-3 mb-5" style={{ color: '#8b949e', fontSize: '0.85rem' }}>
-            
-            {/* Iteramos sobre el arreglo de 'constraints' que viene de Mongo */}
             {problem.constraints && problem.constraints.length > 0 ? (
               problem.constraints.map((restriccion: string, index: number) => (
                 <li key={index} className="mb-1">{restriccion}</li>
@@ -136,8 +226,6 @@ const ProblemDetail: React.FC = () => {
             ) : (
               <li className="mb-1">No hay restricciones adicionales registradas.</li>
             )}
-            
-            {/* El límite de tiempo siempre se calcula automáticamente */}
             <li className="mb-1 text-white">
               El tiempo máximo aceptable para responder es {(problem.timeLimit / 1000).toFixed(1)} segundos.
             </li>
@@ -152,9 +240,7 @@ const ProblemDetail: React.FC = () => {
           </div>
         </div>
 
-        {/* ========================================================== */}
-        {/* COLUMNA DERECHA: EDITOR Y CONSOLA                          */}
-        {/* ========================================================== */}
+        {/* COLUMNA DERECHA: EDITOR Y CONSOLA */}
         <div className="col-lg-7 d-flex flex-column">
           
           <div className="card flex-grow-1 mb-3" style={{ backgroundColor: '#161b22', border: '1px solid #30363d', borderRadius: '6px' }}>
@@ -173,10 +259,12 @@ const ProblemDetail: React.FC = () => {
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 spellCheck="false"
+                disabled={isSubmitting} // Deshabilitamos la edición mientras evalúa
                 style={{ 
                   width: '100%', height: '100%', minHeight: '300px', backgroundColor: '#0d1117', color: '#79c0ff', 
                   border: 'none', padding: '15px', fontFamily: 'SFMono-Regular, Consolas, Monaco, monospace', 
-                  fontSize: '0.85rem', outline: 'none', resize: 'none'
+                  fontSize: '0.85rem', outline: 'none', resize: 'none',
+                  opacity: isSubmitting ? 0.7 : 1
                 }}
               />
             </div>
@@ -186,28 +274,65 @@ const ProblemDetail: React.FC = () => {
                 &gt;_ CONSOLA TERMINAL
               </button>
               <div>
-                <button className="btn btn-sm text-dark me-2" style={{ backgroundColor: '#c9d1d9', fontWeight: 'bold', fontSize: '0.75rem' }}>
+                <button 
+                  className="btn btn-sm text-dark me-2" 
+                  onClick={handleRunCode}
+                  disabled={isSubmitting} 
+                  style={{ backgroundColor: '#c9d1d9', fontWeight: 'bold', fontSize: '0.75rem' }}
+                >
                   ▶ Ejecutar Código
                 </button>
-                <button className="btn btn-sm text-white" style={{ backgroundColor: '#238636', fontWeight: 'bold', fontSize: '0.75rem' }}>
-                  Enviar Solución
+                <button 
+                  className="btn btn-sm text-white" 
+                  onClick={handleSubmitSolution}
+                  disabled={isSubmitting} // Deshabilitar mientras procesa
+                  style={{ backgroundColor: isSubmitting ? '#1f6a29' : '#238636', fontWeight: 'bold', fontSize: '0.75rem' }}
+                >
+                  {isSubmitting ? 'Evaluando...' : 'Enviar Solución'}
                 </button>
               </div>
             </div>
           </div>
 
+          {/* ÁREA DE TERMINAL Y RESULTADOS DINÁMICOS */}
           <div className="card p-3" style={{ backgroundColor: '#161b22', border: '1px solid #30363d', borderRadius: '6px' }}>
              <span className="mb-2" style={{ color: '#8b949e', fontSize: '0.7rem', letterSpacing: '1px' }}>&gt;_ SALIDA TERMINAL & CASOS EVALUADOS</span>
              
              <div className="mb-2">
                <label className="text-white mb-1" style={{ fontSize: '0.75rem' }}>ENTRADA ESTÁNDAR EN CALIENTE:</label>
-               <input type="text" className="form-control form-control-sm bg-dark text-white border-secondary" defaultValue="2 3" style={{ fontFamily: 'monospace' }} />
+               <textarea 
+                 className="form-control form-control-sm bg-dark text-white border-secondary" 
+                 value={customInput}
+                 onChange={(e) => setCustomInput(e.target.value)}
+                 disabled={isSubmitting} 
+                 style={{ fontFamily: 'monospace', minHeight: '60px' }} 
+               />
              </div>
 
              <div className="p-2 rounded mt-2" style={{ backgroundColor: '#0d1117', border: '1px dashed #30363d', minHeight: '60px' }}>
-               <span style={{ color: '#8b949e', fontSize: '0.75rem' }}>
-                 &gt; Presiona "Ejecutar Código" para compilar sobre tus casos o "Enviar Solución" para correr los pools de RabbitMQ.
+               <span style={{ 
+                 color: terminalOutput.includes('✅') ? '#3fb950' : terminalOutput.includes('❌') ? '#f85149' : '#8b949e', 
+                 fontSize: '0.75rem', 
+                 whiteSpace: 'pre-wrap',
+                 fontFamily: 'monospace'
+                }}>
+                 {terminalOutput}
                </span>
+
+               {/* Renderizar casos de prueba si ya terminó (solo se usa en "Enviar Solución") */}
+               {testResults.length > 0 && (
+                 <div className="mt-3">
+                   {testResults.map((res, i) => (
+                     <div key={i} className="mb-1 d-flex align-items-center" style={{ fontSize: '0.75rem', fontFamily: 'monospace' }}>
+                       <span style={{ color: res.passed ? '#3fb950' : '#f85149', marginRight: '10px' }}>
+                         {res.passed ? '[ PASS ]' : '[ FAIL ]'}
+                       </span>
+                       <span style={{ color: '#c9d1d9' }}>Caso {i + 1} </span>
+                       {!res.passed && <span style={{ color: '#8b949e', marginLeft: '10px' }}>Salida: {res.output}</span>}
+                     </div>
+                   ))}
+                 </div>
+               )}
              </div>
           </div>
 

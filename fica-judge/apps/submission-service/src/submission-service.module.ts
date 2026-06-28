@@ -4,6 +4,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { SubmissionServiceController } from './submission-service.controller';
 import { SubmissionServiceService } from './submission-service.service';
 import { Submission } from './entities/submission.entity';
+import { MongooseModule } from '@nestjs/mongoose'; // 👈 Importamos Mongoose
+import { Problem, ProblemSchema } from './schemas/problem.schema'; // 👈 Importamos el esquema
 
 @Module({
   imports: [
@@ -21,6 +23,10 @@ import { Submission } from './entities/submission.entity';
 
     // 2. Registramos la Entidad
     TypeOrmModule.forFeature([Submission]),
+
+    // 2. Conexión a MONGODB (Para leer los casos de prueba secretos)
+    MongooseModule.forRoot('mongodb://mongo_admin:mongo_secret@localhost:27017/problem_db?authSource=admin'),
+    MongooseModule.forFeature([{ name: Problem.name, schema: ProblemSchema }]),
 
     // 3. Conexión a RabbitMQ
     ClientsModule.register([
