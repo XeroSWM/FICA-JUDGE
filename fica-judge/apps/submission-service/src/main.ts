@@ -14,8 +14,8 @@ async function bootstrap() {
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.RMQ,
     options: {
-      // Forzamos la conexión con las credenciales por defecto
-      urls: ['amqp://guest:guest@localhost:5672'],
+      // 👇 ¡Aquí está el cambio! Usando el nuevo administrador
+      urls: ['amqp://admin:admin123@localhost:5672'],
       queue: 'submissions_queue',
       queueOptions: {
         durable: true, // La cola sobrevive si RabbitMQ se reinicia
