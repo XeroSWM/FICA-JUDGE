@@ -38,8 +38,6 @@ services:
     networks:
       - fica_network
 
-  
-
   problem-db:
     image: mongo:6
     container_name: fica_problem_db
@@ -62,9 +60,27 @@ services:
     networks:
       - fica_network
 
+  # ==========================================
+  # BASE DE DATOS MOTOR DE EVALUACIÓN
+  # ==========================================
+  submission-db:
+    image: postgres:15-alpine
+    container_name: fica_submission_db
+    ports:
+      - "5433:5432" # Expuesto en el 5433 para no chocar con iam-db
+    environment:
+      POSTGRES_USER: submission_user
+      POSTGRES_PASSWORD: submission_password
+      POSTGRES_DB: submission_db
+    volumes:
+      - submission_db_data:/var/lib/postgresql/data
+    networks:
+      - fica_network
+
 volumes:
   iam_db_data:
   problem_db_data:
+  submission_db_data: # Nuevo volumen agregado
 
 networks:
   fica_network:
