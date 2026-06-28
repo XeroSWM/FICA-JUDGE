@@ -54,6 +54,15 @@
       "compilerOptions": {
         "tsConfigPath": "libs/shared-contracts/tsconfig.lib.json"
       }
+    },
+    "submission-service": {
+      "type": "application",
+      "root": "apps/submission-service",
+      "entryFile": "main",
+      "sourceRoot": "apps/submission-service/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/submission-service/tsconfig.app.json"
+      }
     }
   }
 }
