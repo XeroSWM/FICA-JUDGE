@@ -6,7 +6,8 @@ import { Ranking, RankingSchema } from './schemas/ranking.schema';
 
 @Module({
   imports: [
-    MongooseModule.forRoot(process.env.MONGO_URI || 'mongodb://localhost:27017/fica_judge_ranking'),
+    // Conexión a Mongo usando las credenciales del Docker Compose
+    MongooseModule.forRoot(process.env.MONGO_URI || 'mongodb://mongo_admin:mongo_secret@localhost:27017/fica_judge_ranking?authSource=admin'),
     MongooseModule.forFeature([{ name: Ranking.name, schema: RankingSchema }]),
   ],
   controllers: [RankingServiceController],
