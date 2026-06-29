@@ -4,8 +4,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { SubmissionServiceController } from './submission-service.controller';
 import { SubmissionServiceService } from './submission-service.service';
 import { Submission } from './entities/submission.entity';
-import { MongooseModule } from '@nestjs/mongoose'; // 👈 Importamos Mongoose
-import { Problem, ProblemSchema } from './schemas/problem.schema'; // 👈 Importamos el esquema
+import { MongooseModule } from '@nestjs/mongoose'; 
+import { Problem, ProblemSchema } from './schemas/problem.schema'; 
 
 @Module({
   imports: [
@@ -13,31 +13,43 @@ import { Problem, ProblemSchema } from './schemas/problem.schema'; // 👈 Impor
     TypeOrmModule.forRoot({
       type: 'postgres',
       host: 'localhost',
-      port: 5433, // 👈 Puerto actualizado para coincidir con el docker-compose
+      port: 5433, 
       username: 'submission_user', 
       password: 'submission_password', 
       database: 'submission_db', 
       entities: [Submission],
-      synchronize: true, // TypeORM creará la tabla 'submissions' automáticamente
+      synchronize: true, 
     }),
 
     // 2. Registramos la Entidad
     TypeOrmModule.forFeature([Submission]),
 
-    // 2. Conexión a MONGODB (Para leer los casos de prueba secretos)
+    // 3. Conexión a MONGODB (Para leer los casos de prueba secretos)
     MongooseModule.forRoot('mongodb://mongo_admin:mongo_secret@localhost:27017/problem_db?authSource=admin'),
     MongooseModule.forFeature([{ name: Problem.name, schema: ProblemSchema }]),
 
-    // 3. Conexión a RabbitMQ
+    // 4. Conexión a RabbitMQ
     ClientsModule.register([
       {
-        name: 'RABBITMQ_CLIENT',
+        name: 'RABBITMQ_CLIENT', // El original que ya tenías
         transport: Transport.RMQ,
         options: {
           urls: ['amqp://admin:admin123@localhost:5672'],
           queue: 'submissions_queue',
           queueOptions: {
             durable: true,
+          },
+        },
+      },
+      // 👇 EL NUEVO MEGÁFONO PARA AVISARLE AL TABLERO DE POSICIONES
+      {
+        name: 'RANKING_CLIENT', 
+        transport: Transport.RMQ,
+        options: {
+          urls: ['amqp://admin:admin123@localhost:5672'],
+          queue: 'ranking_queue',
+          queueOptions: {
+            durable: false,
           },
         },
       },
