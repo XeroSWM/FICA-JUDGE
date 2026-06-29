@@ -1,19 +1,18 @@
-import { NestFactory } from '@nestjs/core';
-import { ApiGatewayModule } from './api-gateway.module';
 import { Logger } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(ApiGatewayModule);
+  const app = await NestFactory.create(AppModule);
   
-  // Prefijo global para la API
-  app.setGlobalPrefix('api/v1');
-  
-  // Habilitar CORS para el Frontend
+  // Habilitar CORS para que el Frontend de React pueda comunicarse
   app.enableCors();
-
-  const PORT = process.env.PORT || 3000;
-  await app.listen(PORT);
   
-  Logger.log(`🚀 [API Gateway] Ejecutándose en: http://localhost:${PORT}/api/v1`, 'Bootstrap');
+  // Prefijo global para todas las rutas: http://localhost:3000/api/...
+  app.setGlobalPrefix('api');
+
+  const port = 3000;
+  await app.listen(port);
+  Logger.log(`🚀 API Gateway corriendo en: http://localhost:${port}/api`);
 }
 bootstrap();
