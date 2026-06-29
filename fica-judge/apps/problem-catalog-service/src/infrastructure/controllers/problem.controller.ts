@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Delete, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Get, Delete, Body, HttpCode, HttpStatus, Param, NotFoundException } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -10,15 +10,14 @@ import { Problem, ProblemDocument } from '../../domain/schemas/problem.schema';
 export class ProblemController {
   constructor(
     private readonly commandBus: CommandBus,
-    private readonly queryBus: QueryBus, // Inyectamos el bus de consultas
-    @InjectModel(Problem.name) private problemModel: Model<ProblemDocument>, // Inyección para el botón de pánico
+    private readonly queryBus: QueryBus, 
+    @InjectModel(Problem.name) private problemModel: Model<ProblemDocument>, 
   ) {}
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async createProblem(@Body() body: any) {
     console.log("1. BODY RECIBIDO DESDE POSTMAN:", body.constraints);
-    // 1. Extraemos TODOS los campos que vienen desde el cliente (Postman/Frontend)
     const { 
       title, 
       description, 
@@ -28,10 +27,9 @@ export class ProblemController {
       tags, 
       templates, 
       testCases, 
-      constraints // <-- AQUÍ ESTÁ EL NUEVO CAMPO
+      constraints 
     } = body;
 
-    // 2. Creamos el comando pasándole todos los datos
     const command = new CreateProblemCommand(
       title, 
       description, 
@@ -44,15 +42,28 @@ export class ProblemController {
       constraints
     );
 
-    // 3. Ejecutamos el comando
     console.log("2. COMANDO CREADO:", command.constraints);
     return this.commandBus.execute(command);
   }
 
-  // ENDPOINT PARA OBTENER LOS PROBLEMAS
+  // ENDPOINT PARA OBTENER TODOS LOS PROBLEMAS
   @Get()
   async getProblems() {
     return this.queryBus.execute(new GetProblemsQuery());
+  }
+
+  // =======================================================
+  // NUEVO ENDPOINT: OBTENER UN PROBLEMA ESPECÍFICO POR ID
+  // =======================================================
+  @Get(':id')
+  async getProblemById(@Param('id') id: string) {
+    const problem = await this.problemModel.findById(id).exec();
+    
+    if (!problem) {
+      throw new NotFoundException(`El problema con ID ${id} no fue encontrado`);
+    }
+    
+    return problem;
   }
 
   // =======================================================
