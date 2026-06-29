@@ -58,7 +58,7 @@ export class SubmissionServiceService {
 
   async executeSandbox(payload: any) {
     const { sourceCode, submissionId, problemId } = payload;
-    let cases = [];
+    let cases: any[] = [];
 
     // ==========================================
     // EXTRACCIÓN DINÁMICA DE CASOS DESDE MONGODB
