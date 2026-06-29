@@ -1,18 +1,23 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CqrsModule } from '@nestjs/cqrs';
+import { JwtModule } from '@nestjs/jwt'; // <-- NUEVO IMPORT PARA JWT
 import { User } from './domain/entities/user.entity';
 import { IamController } from './infrastructure/controllers/iam.controller';
 import { HealthController } from './infrastructure/controllers/health.controller';
 import { RegisterUserHandler } from './application/commands/register-user.handler';
-import { LoginUserHandler } from './application/commands/login-user.handler'; // <-- 1. IMPORTAR AQUÍ
+import { LoginUserHandler } from './application/commands/login-user.handler';
 
-// <-- 2. AGREGAR AL ARREGLO AQUÍ
 const CommandHandlers = [RegisterUserHandler, LoginUserHandler]; 
 
 @Module({
   imports: [
     CqrsModule,
+    // <-- REGISTRO DEL MÓDULO JWT
+    JwtModule.register({
+      secret: process.env.JWT_SECRET || 'TU_CLAVE_SECRETA_FICA_JUDGE_2026', 
+      signOptions: { expiresIn: '8h' },
+    }),
     TypeOrmModule.forRoot({
       type: 'postgres',
       host: process.env.DB_HOST || 'localhost',
@@ -22,7 +27,6 @@ const CommandHandlers = [RegisterUserHandler, LoginUserHandler];
       database: process.env.DB_NAME || 'iam_db',
       entities: [User],
       synchronize: true,
-      // NUEVO: Habilitamos SSL si la variable DB_HOST existe (es decir, estamos en AWS)
       ssl: process.env.DB_HOST ? { rejectUnauthorized: false } : false,
     }),
     TypeOrmModule.forFeature([User]),

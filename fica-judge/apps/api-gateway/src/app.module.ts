@@ -3,6 +3,7 @@ import { HttpModule } from '@nestjs/axios';
 import { IamController } from './proxy/iam.controller'; // 👈 Importamos el nuevo controlador
 import { CatalogController } from './proxy/catalog.controller';
 import { SubmissionController } from './proxy/submission.controller';
+import { JwtStrategy } from './auth/jwt.strategy';
 
 @Module({
   imports: [
@@ -16,6 +17,6 @@ import { SubmissionController } from './proxy/submission.controller';
     CatalogController,
     SubmissionController,
   ],
-  providers: [],
+  providers: [JwtStrategy],
 })
 export class AppModule {}

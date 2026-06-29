@@ -46,6 +46,15 @@
         "tsConfigPath": "apps/problem-catalog-service/tsconfig.app.json"
       }
     },
+    "ranking-service": {
+      "type": "application",
+      "root": "apps/ranking-service",
+      "entryFile": "main",
+      "sourceRoot": "apps/ranking-service/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/ranking-service/tsconfig.app.json"
+      }
+    },
     "shared-contracts": {
       "type": "library",
       "root": "libs/shared-contracts",
