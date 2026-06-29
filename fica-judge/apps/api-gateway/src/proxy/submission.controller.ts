@@ -1,6 +1,6 @@
 import { Controller, Post, Get, Body, Param, Res } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
-import { Response } from 'express';
+import type { Response } from 'express';
 import { firstValueFrom } from 'rxjs';
 
 @Controller('submissions')

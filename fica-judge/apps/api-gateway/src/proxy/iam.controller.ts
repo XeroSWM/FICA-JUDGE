@@ -1,6 +1,6 @@
 import { Controller, Post, Get, Body, Res, UseGuards, Req } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
-import { Response, Request } from 'express';
+import type { Response, Request } from 'express';
 import { firstValueFrom } from 'rxjs';
 
 @Controller('auth')
