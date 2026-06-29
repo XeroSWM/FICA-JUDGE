@@ -14,6 +14,9 @@ export class SubmissionServiceService {
 
   constructor(
     @Inject('RABBITMQ_CLIENT') private readonly rabbitClient: ClientProxy,
+    // 👇 ESTE ES EL NUEVO MEGÁFONO PARA EL RANKING
+    @Inject('RANKING_CLIENT') private readonly rankingClient: ClientProxy, 
+    
     // Repositorio de PostgreSQL para el historial de envíos
     @InjectRepository(Submission)
     private readonly submissionRepository: Repository<Submission>,
@@ -57,7 +60,8 @@ export class SubmissionServiceService {
   }
 
   async executeSandbox(payload: any) {
-    const { sourceCode, submissionId, problemId } = payload;
+    // 👇 Sacamos también el studentId del paquete que llegó
+    const { sourceCode, submissionId, problemId, studentId } = payload;
     let cases: any[] = [];
 
     // ==========================================
@@ -179,9 +183,19 @@ export class SubmissionServiceService {
     if (submissionId) {
       await this.submissionRepository.update(submissionId, {
         status: finalStatus,
-        results: results // TypeORM serializará esto automáticamente (JSONB)
+        results: results
       });
       console.log(`💾 Guardado exitoso en Postgres para ID: ${submissionId}`);
+
+      // 👇 AQUÍ ESTÁ LA MAGIA: Si el código pasó, enviamos los puntos al tablero
+      if (finalStatus === 'ACCEPTED') {
+        this.rankingClient.emit('submission_evaluated', {
+          studentId: studentId,
+          status: finalStatus,
+          problemId: problemId
+        });
+        console.log('📢 Evento enviado a RabbitMQ para el Ranking: submission_evaluated');
+      }
     }
 
     return { status: finalStatus, results };
@@ -226,7 +240,6 @@ export class SubmissionServiceService {
         const len = outputBuffer.readUInt32BE(offset + 4);
         const chunk = outputBuffer.slice(offset + 8, offset + 8 + len).toString();
         
-        // type 1 es stdout, type 2 es stderr (errores de python)
         output += chunk; 
         offset += 8 + len;
       }

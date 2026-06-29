@@ -1,12 +1,21 @@
 import { Controller, Get } from '@nestjs/common';
-import { RankingServiceService } from './ranking-service.service';
+import { EventPattern, Payload } from '@nestjs/microservices';
+import { RankingService } from './ranking-service.service';
 
-@Controller()
+@Controller('ranking')
 export class RankingServiceController {
-  constructor(private readonly rankingServiceService: RankingServiceService) {}
+  constructor(private readonly rankingService: RankingService) {}
 
-  @Get()
-  getHello(): string {
-    return this.rankingServiceService.getHello();
+  // 🌐 ENDPOINT HTTP: Responde al API Gateway cuando React pide la tabla
+  @Get('leaderboard')
+  async getLeaderboard() {
+    return this.rankingService.getLeaderboard();
+  }
+
+  // 🐰 EVENT LISTENER: Escucha silenciosamente a RabbitMQ en segundo plano
+  @EventPattern('submission_evaluated')
+  async handleSubmissionEvaluated(@Payload() data: any) {
+    console.log('🏆 Evento recibido desde RabbitMQ:', data);
+    await this.rankingService.processSubmissionEvent(data);
   }
 }
