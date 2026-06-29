@@ -25,19 +25,16 @@ const ProblemDetail: React.FC = () => {
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(true);
 
-  // ==========================================
-  // NUEVOS ESTADOS PARA EL MOTOR DE EVALUACIÓN
-  // ==========================================
+  // Estados
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [terminalOutput, setTerminalOutput] = useState('> Presiona "Ejecutar Código" para compilar sobre tus casos o "Enviar Solución" para correr los pools de RabbitMQ.');
   const [testResults, setTestResults] = useState<any[]>([]);
-  
-  // Estado para la Entrada Estándar en Caliente (Custom Input)
   const [customInput, setCustomInput] = useState("3\n2 7 11\n9"); 
 
   useEffect(() => {
     const fetchProblem = async () => {
-      const apiUrl = import.meta.env.VITE_CATALOG_API_URL || 'http://localhost:3002';
+      // ACTUALIZACIÓN: Apuntamos al API Gateway
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
       
       try {
         const response = await axios.get(`${apiUrl}/problems/${id}`);
@@ -65,25 +62,21 @@ const ProblemDetail: React.FC = () => {
     fetchProblem();
   }, [id]);
 
-  // ==========================================
-  // LÓGICA MODO: "EJECUTAR CÓDIGO" (Síncrono)
-  // ==========================================
   const handleRunCode = async () => {
     setIsSubmitting(true);
-    setTestResults([]); // Limpiamos resultados anteriores
+    setTestResults([]);
     setTerminalOutput("> Compilando y ejecutando código en entorno seguro...");
 
     try {
-      // Hacemos el POST directo a la nueva ruta /run
-      const response = await axios.post('http://localhost:3003/submissions/run', {
+      // ACTUALIZACIÓN: POST al API Gateway
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+      const response = await axios.post(`${apiUrl}/submissions/run`, {
         language: 'python',
         sourceCode: code,
-        input: customInput // Enviamos lo que haya escrito el usuario en la cajita
+        input: customInput
       });
 
       setIsSubmitting(false);
-      
-      // Imprimimos la salida cruda de la consola
       setTerminalOutput(`> Salida del programa:\n\n${response.data.output || '(Programa finalizado sin imprimir nada)'}`);
 
     } catch (error) {
@@ -92,9 +85,6 @@ const ProblemDetail: React.FC = () => {
     }
   };
 
-  // ==========================================
-  // LÓGICA MODO: "ENVIAR SOLUCIÓN" (Asíncrono / RabbitMQ)
-  // ==========================================
   const handleSubmitSolution = async () => {
     if (!problem) return;
     
@@ -103,9 +93,10 @@ const ProblemDetail: React.FC = () => {
     setTerminalOutput("> Empaquetando código y enviando a la cola de RabbitMQ...");
 
     try {
-      // 1. Enviamos el código al Submission Service (Sin los testCases quemados)
-      const response = await axios.post('http://localhost:3003/submissions', {
-        studentId: 'user_jefferson', // En el futuro saldrá de tu AuthContext
+      // ACTUALIZACIÓN: POST al API Gateway
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+      const response = await axios.post(`${apiUrl}/submissions`, {
+        studentId: 'user_jefferson',
         problemId: problem._id || id,
         language: 'python',
         sourceCode: code
@@ -114,12 +105,11 @@ const ProblemDetail: React.FC = () => {
       if (response.data.status === 'PENDING') {
         const subId = response.data.submissionId;
         setTerminalOutput(`> Código encolado (UUID: ${subId.split('-')[0]}...). Ejecutando en Sandbox...`);
-        // 2. Iniciamos el sondeo
         pollSubmissionResult(subId);
       }
     } catch (error) {
       console.error(error);
-      setTerminalOutput("> [ERROR] No se pudo conectar con el motor de evaluación (Puerto 3003).");
+      setTerminalOutput("> [ERROR] No se pudo conectar con el motor de evaluación.");
       setIsSubmitting(false);
     }
   };
@@ -127,10 +117,11 @@ const ProblemDetail: React.FC = () => {
   const pollSubmissionResult = (submissionId: string) => {
     const pollInterval = setInterval(async () => {
       try {
-        const res = await axios.get(`http://localhost:3003/submissions/${submissionId}`);
+        // ACTUALIZACIÓN: GET al API Gateway
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+        const res = await axios.get(`${apiUrl}/submissions/${submissionId}`);
         const data = res.data;
 
-        // Si el Worker ya guardó el resultado final en Postgres
         if (data.status !== 'PENDING') {
           clearInterval(pollInterval);
           setIsSubmitting(false);
@@ -143,7 +134,6 @@ const ProblemDetail: React.FC = () => {
             setTerminalOutput(`> ⚠️ Error en tiempo de ejecución. Veredicto Final: ${data.status}`);
           }
 
-          // Guardamos los resultados detallados para mostrarlos en la UI
           if (data.results) {
             setTestResults(data.results);
           }
@@ -153,7 +143,7 @@ const ProblemDetail: React.FC = () => {
         setTerminalOutput("> [ERROR] Falló la consulta de estado con la base de datos.");
         setIsSubmitting(false);
       }
-    }, 1000); // Preguntar cada 1 segundo
+    }, 1000);
   };
 
   if (loading) return <div className="p-4" style={{ color: '#8b949e' }}>Cargando entorno de evaluación...</div>;
@@ -259,7 +249,7 @@ const ProblemDetail: React.FC = () => {
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 spellCheck="false"
-                disabled={isSubmitting} // Deshabilitamos la edición mientras evalúa
+                disabled={isSubmitting}
                 style={{ 
                   width: '100%', height: '100%', minHeight: '300px', backgroundColor: '#0d1117', color: '#79c0ff', 
                   border: 'none', padding: '15px', fontFamily: 'SFMono-Regular, Consolas, Monaco, monospace', 
@@ -285,7 +275,7 @@ const ProblemDetail: React.FC = () => {
                 <button 
                   className="btn btn-sm text-white" 
                   onClick={handleSubmitSolution}
-                  disabled={isSubmitting} // Deshabilitar mientras procesa
+                  disabled={isSubmitting}
                   style={{ backgroundColor: isSubmitting ? '#1f6a29' : '#238636', fontWeight: 'bold', fontSize: '0.75rem' }}
                 >
                   {isSubmitting ? 'Evaluando...' : 'Enviar Solución'}
@@ -319,7 +309,6 @@ const ProblemDetail: React.FC = () => {
                  {terminalOutput}
                </span>
 
-               {/* Renderizar casos de prueba si ya terminó (solo se usa en "Enviar Solución") */}
                {testResults.length > 0 && (
                  <div className="mt-3">
                    {testResults.map((res, i) => (

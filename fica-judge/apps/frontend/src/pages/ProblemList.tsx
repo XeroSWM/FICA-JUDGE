@@ -20,7 +20,8 @@ const ProblemList: React.FC = () => {
   useEffect(() => {
     const fetchProblems = async () => {
       try {
-        const apiUrl = import.meta.env.VITE_CATALOG_API_URL || 'http://localhost:3002';
+        // ACTUALIZACIÓN: Apuntamos al API Gateway
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
         const response = await axios.get(`${apiUrl}/problems`);
         
         setProblems(response.data);
