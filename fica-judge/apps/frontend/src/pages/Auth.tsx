@@ -44,7 +44,8 @@ const Auth: React.FC = () => {
         });
 
         // 1. Guardamos el token y los datos del usuario en el navegador
-        localStorage.setItem('fj_token', response.data.token);
+        const tokenReal = response.data.token || response.data.access_token;
+        localStorage.setItem('fj_token', tokenReal);
         localStorage.setItem('fj_user', JSON.stringify(response.data.user));
 
         setMessage({ 
