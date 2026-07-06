@@ -22,6 +22,7 @@ export class SubmissionServiceService {
   }
 
   async processNewSubmission(payload: any) {
+    console.log("📥 Payload crudo llegando al Backend:", JSON.stringify(payload));
     const newSubmission = this.submissionRepository.create({
       studentId: payload.studentId || 'unknown_student',
       problemId: payload.problemId || 'unknown_problem',
@@ -56,27 +57,29 @@ export class SubmissionServiceService {
     // EXTRACCIÓN DINÁMICA DE CASOS Y NORMALIZACIÓN DE DIFICULTAD
     // ==========================================
     try {
-      const problemRecord = await this.problemModel.findById(problemId);
+      // 👇 FIX 1: .lean() para traer el JSON puro sin que Mongoose lo filtre
+      const problemRecord = await this.problemModel.findById(problemId).lean();
       
-      if (!problemRecord || !problemRecord.testCases || problemRecord.testCases.length === 0) {
+      if (!problemRecord || !(problemRecord as any).testCases || (problemRecord as any).testCases.length === 0) {
         console.error(`❌ El problema ${problemId} no tiene casos de prueba en Mongo.`);
         if (submissionId) await this.submissionRepository.update(submissionId, { status: 'SYSTEM_ERROR', results: [] });
         return { status: 'SYSTEM_ERROR', results: [] };
       }
 
-      cases = problemRecord.testCases;
+      cases = (problemRecord as any).testCases;
       
-      const rawDifficulty = ((problemRecord as any).difficulty || 'FÁCIL')
+      // 👇 FIX 2: Normalizador inteligente y bilingüe
+      const rawDifficulty = String((problemRecord as any).difficulty || 'FÁCIL')
         .toUpperCase()
         .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
         .trim();
 
-      if (rawDifficulty === 'FACIL') possiblePoints = 10;
-      else if (rawDifficulty === 'MEDIO') possiblePoints = 30;
-      else if (rawDifficulty === 'DIFICIL') possiblePoints = 100;
+      if (rawDifficulty === 'FACIL' || rawDifficulty === 'EASY') possiblePoints = 10;
+      else if (rawDifficulty === 'MEDIO' || rawDifficulty === 'MEDIUM') possiblePoints = 30;
+      else if (rawDifficulty === 'DIFICIL' || rawDifficulty === 'HARD') possiblePoints = 100;
       else possiblePoints = 10; 
 
-      console.log(`👷‍♂️ WORKER: Evaluando envío [${submissionId}] - Dificultad: ${rawDifficulty} (${possiblePoints} pts potenciales)...`);
+      console.log(`👷‍♂️ WORKER: Evaluando envío [${submissionId}] - Dificultad cruda: ${rawDifficulty} -> ${possiblePoints} pts potenciales.`);
 
     } catch (error) {
       console.error('❌ Error conectando con MongoDB:', error);
@@ -198,7 +201,7 @@ export class SubmissionServiceService {
         problemId: safeProblemId,
         earnedPoints: earnedPoints, 
         isNewSolve: isNewSolve,
-        skipAttempt: skipAttempt // 👈 Nueva bandera para el Secretario
+        skipAttempt: skipAttempt
       });
     }
 

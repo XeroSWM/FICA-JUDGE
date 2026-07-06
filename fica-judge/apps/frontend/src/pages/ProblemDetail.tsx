@@ -34,17 +34,27 @@ const ProblemDetail: React.FC = () => {
   // Helper para obtener el token en cada petición
   const getToken = () => localStorage.getItem('fj_token');
 
-  // Helper para obtener el nombre real del usuario logueado
+  // 👇 FIX: Función "a prueba de balas" para extraer tu identidad
   const getUserData = () => {
     const userStr = localStorage.getItem('fj_user');
+    
     if (userStr) {
-      const user = JSON.parse(userStr);
-      return { 
-        id: user.email || 'user_demo',
-        name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Estudiante FICA' 
-      };
+      try {
+        const user = JSON.parse(userStr);
+        // Hacemos un barrido buscando cualquier llave posible que tenga tu correo o ID
+        const id = user.email || user.correo || user.id || user._id || user.username || 'estudiante_anonimo';
+        
+        // Hacemos lo mismo para construir tu nombre real
+        const name = user.firstName 
+          ? `${user.firstName} ${user.lastName || ''}`.trim() 
+          : (user.name || user.nombres || user.nombre || id);
+          
+        return { id, name };
+      } catch (e) {
+        console.error("No se pudo leer la sesión del usuario.");
+      }
     }
-    return { id: 'user_demo', name: 'Estudiante FICA' };
+    return { id: 'estudiante_anonimo', name: 'Estudiante FICA' };
   };
 
   useEffect(() => {
@@ -53,7 +63,7 @@ const ProblemDetail: React.FC = () => {
       
       try {
         const response = await axios.get(`${apiUrl}/problems/${id}`, {
-          headers: { Authorization: `Bearer ${getToken()}` } // 👈 Token agregado
+          headers: { Authorization: `Bearer ${getToken()}` }
         });
         setProblem(response.data);
         if (response.data.templates && response.data.templates.length > 0) {
@@ -62,7 +72,7 @@ const ProblemDetail: React.FC = () => {
       } catch (error) {
         try {
           const fallbackRes = await axios.get(`${apiUrl}/problems`, {
-            headers: { Authorization: `Bearer ${getToken()}` } // 👈 Token agregado
+            headers: { Authorization: `Bearer ${getToken()}` } 
           });
           const found = fallbackRes.data.find((p: any) => p._id === id);
           if (found) {
@@ -93,7 +103,7 @@ const ProblemDetail: React.FC = () => {
         sourceCode: code,
         input: customInput
       }, {
-        headers: { Authorization: `Bearer ${getToken()}` } // 👈 Token agregado para pasar el Gateway
+        headers: { Authorization: `Bearer ${getToken()}` }
       });
 
       setIsSubmitting(false);
@@ -114,15 +124,22 @@ const ProblemDetail: React.FC = () => {
 
     try {
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-      const currentUser = getUserData(); // 👈 Extraemos tus datos reales
+      const currentUser = getUserData(); 
 
-      const response = await axios.post(`${apiUrl}/submissions`, {
-        studentId: currentUser.name, // 👈 Enviamos tu nombre al Ranking
+      // Armamos el paquete de datos
+      const payloadEnvio = {
+        studentId: currentUser.id, 
+        name: currentUser.name,
         problemId: problem._id || id,
         language: 'python',
         sourceCode: code
-      }, {
-        headers: { Authorization: `Bearer ${getToken()}` } // 👈 Token agregado
+      };
+
+      // 👇 Imprimimos en consola para que veas exactamente qué viaja al backend
+      console.log("🚀 Payload enviado al API Gateway:", payloadEnvio);
+
+      const response = await axios.post(`${apiUrl}/submissions`, payloadEnvio, {
+        headers: { Authorization: `Bearer ${getToken()}` } 
       });
 
       if (response.data.status === 'PENDING') {
@@ -142,7 +159,7 @@ const ProblemDetail: React.FC = () => {
       try {
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
         const res = await axios.get(`${apiUrl}/submissions/${submissionId}`, {
-          headers: { Authorization: `Bearer ${getToken()}` } // 👈 Token agregado
+          headers: { Authorization: `Bearer ${getToken()}` }
         });
         const data = res.data;
 
