@@ -14,31 +14,25 @@ export class SubmissionServiceService {
 
   constructor(
     @Inject('RABBITMQ_CLIENT') private readonly rabbitClient: ClientProxy,
-    // Megáfono para el Ranking
     @Inject('RANKING_CLIENT') private readonly rankingClient: ClientProxy, 
-    
-    // Repositorio de PostgreSQL para el historial de envíos
     @InjectRepository(Submission) private readonly submissionRepository: Repository<Submission>,
-    // Modelo de MongoDB para leer los problemas y sus test cases secretos
     @InjectModel(Problem.name) private readonly problemModel: Model<Problem>, 
   ) {
     this.docker = new Docker({ host: '127.0.0.1', port: 2375 });
   }
 
   async processNewSubmission(payload: any) {
-    // 1. Creamos y guardamos el registro inicial en Postgres
     const newSubmission = this.submissionRepository.create({
       studentId: payload.studentId || 'unknown_student',
       problemId: payload.problemId || 'unknown_problem',
       language: payload.language || 'python',
       sourceCode: payload.sourceCode,
       status: 'PENDING',
-      results: [], // Inicialmente vacío
+      results: [], 
     });
     
     const savedSubmission = await this.submissionRepository.save(newSubmission);
 
-    // 2. Inyectamos el ID (ahora un UUID o ID autoincremental de Postgres) en el evento
     const eventPayload = {
       ...payload,
       submissionId: savedSubmission.id
@@ -46,7 +40,6 @@ export class SubmissionServiceService {
 
     this.rabbitClient.emit('evaluate_code', eventPayload);
     
-    // 3. Devolvemos el ID real al Frontend
     return { 
       status: 'PENDING', 
       submissionId: savedSubmission.id,
@@ -55,13 +48,12 @@ export class SubmissionServiceService {
   }
 
   async executeSandbox(payload: any) {
-    // 👇 Sacamos el name también para enviarlo al ranking
     const { sourceCode, submissionId, problemId, studentId, name } = payload;
     let cases: any[] = [];
-    let possiblePoints = 0; // 👈 Variable para guardar los puntos posibles
+    let possiblePoints = 0; 
 
     // ==========================================
-    // EXTRACCIÓN DINÁMICA DE CASOS Y DIFICULTAD DESDE MONGODB
+    // EXTRACCIÓN DINÁMICA DE CASOS Y NORMALIZACIÓN DE DIFICULTAD
     // ==========================================
     try {
       const problemRecord = await this.problemModel.findById(problemId);
@@ -74,14 +66,17 @@ export class SubmissionServiceService {
 
       cases = problemRecord.testCases;
       
-      // 👇 ASIGNACIÓN DE PUNTOS SEGÚN DIFICULTAD 👇
-      const difficulty = problemRecord.difficulty?.toUpperCase() || 'FÁCIL';
-      if (difficulty === 'FÁCIL' || difficulty === 'FACIL') possiblePoints = 10;
-      else if (difficulty === 'MEDIO') possiblePoints = 30;
-      else if (difficulty === 'DIFÍCIL' || difficulty === 'DIFICIL') possiblePoints = 100;
-      else possiblePoints = 10; // Valor por defecto
+      const rawDifficulty = ((problemRecord as any).difficulty || 'FÁCIL')
+        .toUpperCase()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .trim();
 
-      console.log(`👷‍♂️ WORKER: Evaluando envío [${submissionId}] - Dificultad: ${difficulty} (${possiblePoints} pts potenciales)...`);
+      if (rawDifficulty === 'FACIL') possiblePoints = 10;
+      else if (rawDifficulty === 'MEDIO') possiblePoints = 30;
+      else if (rawDifficulty === 'DIFICIL') possiblePoints = 100;
+      else possiblePoints = 10; 
+
+      console.log(`👷‍♂️ WORKER: Evaluando envío [${submissionId}] - Dificultad: ${rawDifficulty} (${possiblePoints} pts potenciales)...`);
 
     } catch (error) {
       console.error('❌ Error conectando con MongoDB:', error);
@@ -117,7 +112,6 @@ export class SubmissionServiceService {
           await Promise.race([waitPromise, timeoutPromise]);
         } catch (err: any) {
           if (err.message === 'TIME_LIMIT_EXCEEDED') {
-            console.log(`⏳ Límite de tiempo excedido en el caso: "${test.input}"`);
             results.push({ input: test.input, passed: false, output: 'Time Limit Exceeded' });
             isAccepted = false;
             continue;
@@ -142,17 +136,10 @@ export class SubmissionServiceService {
         output = output.trim();
         const passed = output === test.expectedOutput?.toString().trim();
         
-        if (!passed) {
-          console.log(`❌ Fallo: Esperado: "${test.expectedOutput}", Recibido: "${output}"`);
-        } else {
-          console.log(`✅ Caso correcto superado.`);
-        }
-
         results.push({ input: test.input, passed, output });
         if (!passed) isAccepted = false;
 
       } catch (error) {
-        console.error('❌ Error en el Sandbox:', error);
         results.push({ input: test.input, passed: false, output: 'Error de ejecución' });
         isAccepted = false;
       } finally {
@@ -162,33 +149,62 @@ export class SubmissionServiceService {
 
     const finalStatus = isAccepted ? 'ACCEPTED' : 'WRONG_ANSWER';
     
-    // 👇 CALCULAMOS PUNTOS GANADOS (Si falló, gana 0, pero cuenta como intento)
-    const earnedPoints = isAccepted ? possiblePoints : 0;
-    
-    console.log(`✅ Envío [${submissionId}] Finalizado: ${finalStatus}. Puntos ganados: ${earnedPoints}`);
+    // ==========================================
+    // CONTROL ESTRICTO DE INTENTOS Y ANTI-FARMEO
+    // ==========================================
+    let earnedPoints = 0;
+    let isNewSolve = false;
+    let skipAttempt = false;
 
-    // 4. ACTUALIZAMOS LA BASE DE DATOS con el veredicto final en Postgres
+    const safeStudentId = studentId || 'unknown_student';
+    const safeProblemId = problemId || 'unknown_problem';
+
+    // Consultamos si el estudiante ya registró un éxito previo en Postgres para este ejercicio
+    const previousSuccesses = await this.submissionRepository.count({
+      where: { studentId: safeStudentId, problemId: safeProblemId, status: 'ACCEPTED' }
+    });
+
+    const alreadySolvedBefore = previousSuccesses > 0;
+
+    if (finalStatus === 'ACCEPTED') {
+      if (!alreadySolvedBefore) {
+        earnedPoints = possiblePoints;
+        isNewSolve = true;
+      } else {
+        // Ya solucionado: se congela todo para proteger sus métricas
+        skipAttempt = true;
+        console.log(`ℹ️ [Sandbox] ${safeStudentId} reenvió una solución correcta a un problema ya resuelto. Protegiendo efectividad.`);
+      }
+    } else {
+      if (alreadySolvedBefore) {
+        // Si el alumno experimenta y su código falla, NO penalizamos sus intentos del ranking
+        skipAttempt = true;
+        console.log(`ℹ️ [Sandbox] ${safeStudentId} falló un intento de prueba en un problema ya solucionado. Ignorando penalización.`);
+      } else {
+        earnedPoints = 0;
+        isNewSolve = false;
+      }
+    }
+    
+    console.log(`✅ Envío [${submissionId}] Finalizado: ${finalStatus}. Puntos ganados: ${earnedPoints} | Ignorar Métricas: ${skipAttempt}`);
+
     if (submissionId) {
       await this.submissionRepository.update(submissionId, { status: finalStatus, results: results });
-      console.log(`💾 Guardado exitoso en Postgres para ID: ${submissionId}`);
 
-      // 👇 EMITIMOS EL EVENTO SIEMPRE (para que el Ranking registre el intento real)
       this.rankingClient.emit('submission_evaluated', {
-        studentId: studentId,
+        studentId: safeStudentId,
         name: name,
         status: finalStatus,
-        problemId: problemId,
-        earnedPoints: earnedPoints // <--- Aquí viajan los puntos calculados
+        problemId: safeProblemId,
+        earnedPoints: earnedPoints, 
+        isNewSolve: isNewSolve,
+        skipAttempt: skipAttempt // 👈 Nueva bandera para el Secretario
       });
-      console.log(`📢 Evento enviado al Ranking (Status: ${finalStatus}) para conteo de intentos y puntos.`);
     }
 
     return { status: finalStatus, results };
   }
 
-  // ==========================================
-  // MODO "EJECUTAR CÓDIGO" (Sin guardar en DB ni validar en Mongo)
-  // ==========================================
   async executeDirectRun(payload: any) {
     const { sourceCode, input } = payload;
     let container: any;
@@ -227,7 +243,7 @@ export class SubmissionServiceService {
 
     } catch (error: any) {
       if (error.message === 'TIME_LIMIT_EXCEEDED') {
-        return { success: false, output: 'Error: Límite de tiempo excedido (Bucle infinito potencial)' };
+        return { success: false, output: 'Error: Límite de tiempo excedido' };
       }
       return { success: false, output: 'Error interno al ejecutar el sandbox.' };
     } finally {
