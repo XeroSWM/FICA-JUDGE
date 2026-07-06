@@ -8,13 +8,15 @@ export class RankingService {
   constructor(@InjectModel(Ranking.name) private rankingModel: Model<Ranking>) {}
 
   async processSubmissionEvent(data: any) {
-    const isAccepted = data.status === 'ACCEPTED';
-    
-    // El puntaje dinámico calculado por el Submission Service (10, 30 o 100 pts)
+    // 👇 PROTECCIÓN TOTAL DE EFECTIVIDAD: Si el problema ya fue solucionado en el pasado,
+    // abortamos la transacción de forma atómica para no alterar los intentos reales.
+    if (data.skipAttempt) {
+      console.log(`ℹ️ [Ranking] Envío omitido para el alumno '${data.studentId}'. El ejercicio ya se encuentra resuelto.`);
+      return;
+    }
+
+    const solvedToAdd = data.isNewSolve ? 1 : 0;
     const pointsToAdd = data.earnedPoints || 0; 
-    const solvedToAdd = isAccepted ? 1 : 0;
-    
-    // Validamos que el ID no llegue nulo para no romper el índice de Mongo
     const studentKey = data.studentId || 'unknown_student';
 
     await this.rankingModel.findOneAndUpdate(
@@ -23,10 +25,9 @@ export class RankingService {
         $inc: { 
           totalScore: pointsToAdd, 
           problemsSolved: solvedToAdd,
-          totalAttempts: 1 // Suma 1 a los intentos reales SIEMPRE
+          totalAttempts: 1 // Solo se acumula si es un intento sobre un problema no resuelto con éxito aún
         },
         $setOnInsert: {
-          // Si el estudiante entra por primera vez a la tabla, inicializamos sus strings
           name: data.name || (data.studentId && data.studentId !== 'unknown_student' ? data.studentId : 'Wilson Xavier'),
           courseSection: 'Sistemas Distribuidos 8A'
         }
@@ -38,10 +39,8 @@ export class RankingService {
   }
 
   async getLeaderboard() {
-    // Buscamos el top 10 de estudiantes con mayor puntaje acumulado
     const rankings = await this.rankingModel.find().sort({ totalScore: -1 }).limit(10).lean().exec();
     
-    // Calculamos dinámicamente la efectividad exacta en base a ejecuciones reales
     return rankings.map(user => {
       const effect = user.totalAttempts > 0 
         ? Math.round((user.problemsSolved / user.totalAttempts) * 100) 
@@ -49,8 +48,8 @@ export class RankingService {
 
       return {
         ...user,
-        attempts: user.totalAttempts, // Mapeo directo para emparejar la columna de tu frontend
-        effectiveness: effect        // Porcentaje real que exige tu mockup de UI
+        attempts: user.totalAttempts, 
+        effectiveness: effect        
       };
     });
   }
