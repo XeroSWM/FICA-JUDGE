@@ -21,7 +21,8 @@ async function bootstrap() {
   await app.startAllMicroservices(); 
   
   // 3. Encendemos el puerto HTTP para que el API Gateway pueda pedir la tabla
-  await app.listen(process.env.PORT ?? 3004); 
+  // 👇 AQUÍ ESTÁ EL CAMBIO: Agregamos '0.0.0.0' para evitar el problema de IPv6 ([::1])
+  await app.listen(process.env.PORT ?? 3004, '0.0.0.0'); 
   
   console.log(`🏆 Ranking Service corriendo HTTP en: ${await app.getUrl()}`);
   console.log(`🐰 Ranking Service conectado al Bróker de Mensajería escuchando eventos...`);

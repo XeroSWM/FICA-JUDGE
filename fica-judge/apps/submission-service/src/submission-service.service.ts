@@ -14,20 +14,15 @@ export class SubmissionServiceService {
 
   constructor(
     @Inject('RABBITMQ_CLIENT') private readonly rabbitClient: ClientProxy,
-    // 👇 ESTE ES EL NUEVO MEGÁFONO PARA EL RANKING
+    // Megáfono para el Ranking
     @Inject('RANKING_CLIENT') private readonly rankingClient: ClientProxy, 
     
     // Repositorio de PostgreSQL para el historial de envíos
-    @InjectRepository(Submission)
-    private readonly submissionRepository: Repository<Submission>,
+    @InjectRepository(Submission) private readonly submissionRepository: Repository<Submission>,
     // Modelo de MongoDB para leer los problemas y sus test cases secretos
-    @InjectModel(Problem.name) 
-    private readonly problemModel: Model<Problem>, 
+    @InjectModel(Problem.name) private readonly problemModel: Model<Problem>, 
   ) {
-    this.docker = new Docker({
-      host: '127.0.0.1',
-      port: 2375
-    });
+    this.docker = new Docker({ host: '127.0.0.1', port: 2375 });
   }
 
   async processNewSubmission(payload: any) {
@@ -60,38 +55,37 @@ export class SubmissionServiceService {
   }
 
   async executeSandbox(payload: any) {
-    // 👇 Sacamos también el studentId del paquete que llegó
-    const { sourceCode, submissionId, problemId, studentId } = payload;
+    // 👇 Sacamos el name también para enviarlo al ranking
+    const { sourceCode, submissionId, problemId, studentId, name } = payload;
     let cases: any[] = [];
+    let possiblePoints = 0; // 👈 Variable para guardar los puntos posibles
 
     // ==========================================
-    // EXTRACCIÓN DINÁMICA DE CASOS DESDE MONGODB
+    // EXTRACCIÓN DINÁMICA DE CASOS Y DIFICULTAD DESDE MONGODB
     // ==========================================
     try {
       const problemRecord = await this.problemModel.findById(problemId);
       
       if (!problemRecord || !problemRecord.testCases || problemRecord.testCases.length === 0) {
         console.error(`❌ El problema ${problemId} no tiene casos de prueba en Mongo.`);
-        if (submissionId) {
-          await this.submissionRepository.update(submissionId, { 
-            status: 'SYSTEM_ERROR', 
-            results: [] 
-          });
-        }
+        if (submissionId) await this.submissionRepository.update(submissionId, { status: 'SYSTEM_ERROR', results: [] });
         return { status: 'SYSTEM_ERROR', results: [] };
       }
 
       cases = problemRecord.testCases;
-      console.log(`👷‍♂️ WORKER: Evaluando envío [${submissionId}] - Extraídos ${cases.length} casos desde MongoDB...`);
+      
+      // 👇 ASIGNACIÓN DE PUNTOS SEGÚN DIFICULTAD 👇
+      const difficulty = problemRecord.difficulty?.toUpperCase() || 'FÁCIL';
+      if (difficulty === 'FÁCIL' || difficulty === 'FACIL') possiblePoints = 10;
+      else if (difficulty === 'MEDIO') possiblePoints = 30;
+      else if (difficulty === 'DIFÍCIL' || difficulty === 'DIFICIL') possiblePoints = 100;
+      else possiblePoints = 10; // Valor por defecto
+
+      console.log(`👷‍♂️ WORKER: Evaluando envío [${submissionId}] - Dificultad: ${difficulty} (${possiblePoints} pts potenciales)...`);
 
     } catch (error) {
       console.error('❌ Error conectando con MongoDB:', error);
-      if (submissionId) {
-        await this.submissionRepository.update(submissionId, { 
-          status: 'SYSTEM_ERROR', 
-          results: [] 
-        });
-      }
+      if (submissionId) await this.submissionRepository.update(submissionId, { status: 'SYSTEM_ERROR', results: [] });
       return { status: 'SYSTEM_ERROR', results: [] };
     }
 
@@ -110,20 +104,14 @@ export class SubmissionServiceService {
 
         container = await this.docker.createContainer({
           Image: 'python:3.9-slim',
-          Cmd: [
-            'sh',
-            '-c',
-            `echo "${base64Input}" | base64 -d | python3 -u -c "$(echo "${base64Code}" | base64 -d)"`
-          ],
+          Cmd: ['sh', '-c', `echo "${base64Input}" | base64 -d | python3 -u -c "$(echo "${base64Code}" | base64 -d)"`],
           Tty: false,
         });
 
         await container.start();
 
         const waitPromise = container.wait();
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('TIME_LIMIT_EXCEEDED')), 5000)
-        );
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('TIME_LIMIT_EXCEEDED')), 5000));
 
         try {
           await Promise.race([waitPromise, timeoutPromise]);
@@ -147,9 +135,7 @@ export class SubmissionServiceService {
           const len = outputBuffer.readUInt32BE(offset + 4);
           const chunk = outputBuffer.slice(offset + 8, offset + 8 + len).toString();
           
-          if (type === 1) { 
-            output += chunk; 
-          }
+          if (type === 1) output += chunk; 
           offset += 8 + len;
         }
         
@@ -170,32 +156,31 @@ export class SubmissionServiceService {
         results.push({ input: test.input, passed: false, output: 'Error de ejecución' });
         isAccepted = false;
       } finally {
-        if (container) {
-          await container.remove({ force: true }).catch(() => {});
-        }
+        if (container) await container.remove({ force: true }).catch(() => {});
       }
     }
 
     const finalStatus = isAccepted ? 'ACCEPTED' : 'WRONG_ANSWER';
-    console.log(`✅ Envío [${submissionId}] Finalizado: ${finalStatus}`);
+    
+    // 👇 CALCULAMOS PUNTOS GANADOS (Si falló, gana 0, pero cuenta como intento)
+    const earnedPoints = isAccepted ? possiblePoints : 0;
+    
+    console.log(`✅ Envío [${submissionId}] Finalizado: ${finalStatus}. Puntos ganados: ${earnedPoints}`);
 
     // 4. ACTUALIZAMOS LA BASE DE DATOS con el veredicto final en Postgres
     if (submissionId) {
-      await this.submissionRepository.update(submissionId, {
-        status: finalStatus,
-        results: results
-      });
+      await this.submissionRepository.update(submissionId, { status: finalStatus, results: results });
       console.log(`💾 Guardado exitoso en Postgres para ID: ${submissionId}`);
 
-      // 👇 AQUÍ ESTÁ LA MAGIA: Si el código pasó, enviamos los puntos al tablero
-      if (finalStatus === 'ACCEPTED') {
-        this.rankingClient.emit('submission_evaluated', {
-          studentId: studentId,
-          status: finalStatus,
-          problemId: problemId
-        });
-        console.log('📢 Evento enviado a RabbitMQ para el Ranking: submission_evaluated');
-      }
+      // 👇 EMITIMOS EL EVENTO SIEMPRE (para que el Ranking registre el intento real)
+      this.rankingClient.emit('submission_evaluated', {
+        studentId: studentId,
+        name: name,
+        status: finalStatus,
+        problemId: problemId,
+        earnedPoints: earnedPoints // <--- Aquí viajan los puntos calculados
+      });
+      console.log(`📢 Evento enviado al Ranking (Status: ${finalStatus}) para conteo de intentos y puntos.`);
     }
 
     return { status: finalStatus, results };
@@ -214,20 +199,14 @@ export class SubmissionServiceService {
 
       container = await this.docker.createContainer({
         Image: 'python:3.9-slim',
-        Cmd: [
-          'sh',
-          '-c',
-          `echo "${base64Input}" | base64 -d | python3 -u -c "$(echo "${base64Code}" | base64 -d)"`
-        ],
+        Cmd: ['sh', '-c', `echo "${base64Input}" | base64 -d | python3 -u -c "$(echo "${base64Code}" | base64 -d)"`],
         Tty: false,
       });
 
       await container.start();
 
       const waitPromise = container.wait();
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('TIME_LIMIT_EXCEEDED')), 5000)
-      );
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('TIME_LIMIT_EXCEEDED')), 5000));
 
       await Promise.race([waitPromise, timeoutPromise]);
 
@@ -252,9 +231,7 @@ export class SubmissionServiceService {
       }
       return { success: false, output: 'Error interno al ejecutar el sandbox.' };
     } finally {
-      if (container) {
-        await container.remove({ force: true }).catch(() => {});
-      }
+      if (container) await container.remove({ force: true }).catch(() => {});
     }
   }
 }

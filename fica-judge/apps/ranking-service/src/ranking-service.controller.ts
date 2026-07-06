@@ -15,7 +15,7 @@ export class RankingServiceController {
   // 🐰 EVENT LISTENER: Escucha silenciosamente a RabbitMQ en segundo plano
   @EventPattern('submission_evaluated')
   async handleSubmissionEvaluated(@Payload() data: any) {
-    console.log('🏆 Evento recibido desde RabbitMQ:', data);
+    console.log('🏆 Evento recibido desde RabbitMQ en Ranking Service:', data);
     await this.rankingService.processSubmissionEvent(data);
   }
 }

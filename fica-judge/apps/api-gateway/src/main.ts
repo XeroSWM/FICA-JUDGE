@@ -11,6 +11,7 @@ async function bootstrap() {
   // Prefijo global para todas las rutas: http://localhost:3000/api/...
   app.setGlobalPrefix('api');
 
+
   const port = 3000;
   await app.listen(port);
   Logger.log(`🚀 API Gateway corriendo en: http://localhost:${port}/api`);
