@@ -4,6 +4,7 @@ import { IamController } from './proxy/iam.controller'; // 👈 Importamos el nu
 import { CatalogController } from './proxy/catalog.controller';
 import { SubmissionController } from './proxy/submission.controller';
 import { JwtStrategy } from './auth/jwt.strategy';
+import { RankingController } from './proxy/ranking.controller';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { JwtStrategy } from './auth/jwt.strategy';
     IamController, // 👈 Registramos el proxy de autenticación
     CatalogController,
     SubmissionController,
+    RankingController,
   ],
   providers: [JwtStrategy],
 })

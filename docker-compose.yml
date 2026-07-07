@@ -77,10 +77,33 @@ services:
     networks:
       - fica_network
 
+  # ==========================================
+  # MICROSERVICIOS FICA-JUDGE
+  # ==========================================
+  ranking-service:
+    build:
+      context: .
+      dockerfile: apps/ranking-service/Dockerfile
+    container_name: fica_ranking_service
+    ports:
+      - "3004:3004"
+    environment:
+      - PORT=3004
+      # AISLAMIENTO LÓGICO: Misma instancia física (problem-db), distinta base de datos (fica_judge_ranking)
+      # Pasa por la autenticación root (authSource=admin)
+      - MONGO_URI=mongodb://mongo_admin:mongo_secret@problem-db:27017/fica_judge_ranking?authSource=admin
+      # Conexión al bróker utilizando el usuario admin definido en rabbitmq
+      - RABBITMQ_URL=amqp://admin:admin123@rabbitmq:5672
+    depends_on:
+      - problem-db
+      - rabbitmq
+    networks:
+      - fica_network
+
 volumes:
   iam_db_data:
   problem_db_data:
-  submission_db_data: # Nuevo volumen agregado
+  submission_db_data:
 
 networks:
   fica_network:

@@ -31,20 +31,49 @@ const ProblemDetail: React.FC = () => {
   const [testResults, setTestResults] = useState<any[]>([]);
   const [customInput, setCustomInput] = useState("3\n2 7 11\n9"); 
 
+  // Helper para obtener el token en cada petición
+  const getToken = () => localStorage.getItem('fj_token');
+
+  // 👇 FIX: Función "a prueba de balas" para extraer tu identidad
+  const getUserData = () => {
+    const userStr = localStorage.getItem('fj_user');
+    
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        // Hacemos un barrido buscando cualquier llave posible que tenga tu correo o ID
+        const id = user.email || user.correo || user.id || user._id || user.username || 'estudiante_anonimo';
+        
+        // Hacemos lo mismo para construir tu nombre real
+        const name = user.firstName 
+          ? `${user.firstName} ${user.lastName || ''}`.trim() 
+          : (user.name || user.nombres || user.nombre || id);
+          
+        return { id, name };
+      } catch (e) {
+        console.error("No se pudo leer la sesión del usuario.");
+      }
+    }
+    return { id: 'estudiante_anonimo', name: 'Estudiante FICA' };
+  };
+
   useEffect(() => {
     const fetchProblem = async () => {
-      // ACTUALIZACIÓN: Apuntamos al API Gateway
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
       
       try {
-        const response = await axios.get(`${apiUrl}/problems/${id}`);
+        const response = await axios.get(`${apiUrl}/problems/${id}`, {
+          headers: { Authorization: `Bearer ${getToken()}` }
+        });
         setProblem(response.data);
         if (response.data.templates && response.data.templates.length > 0) {
           setCode(response.data.templates[0].starterCode);
         }
       } catch (error) {
         try {
-          const fallbackRes = await axios.get(`${apiUrl}/problems`);
+          const fallbackRes = await axios.get(`${apiUrl}/problems`, {
+            headers: { Authorization: `Bearer ${getToken()}` } 
+          });
           const found = fallbackRes.data.find((p: any) => p._id === id);
           if (found) {
             setProblem(found);
@@ -68,12 +97,13 @@ const ProblemDetail: React.FC = () => {
     setTerminalOutput("> Compilando y ejecutando código en entorno seguro...");
 
     try {
-      // ACTUALIZACIÓN: POST al API Gateway
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
       const response = await axios.post(`${apiUrl}/submissions/run`, {
         language: 'python',
         sourceCode: code,
         input: customInput
+      }, {
+        headers: { Authorization: `Bearer ${getToken()}` }
       });
 
       setIsSubmitting(false);
@@ -81,7 +111,7 @@ const ProblemDetail: React.FC = () => {
 
     } catch (error) {
       setIsSubmitting(false);
-      setTerminalOutput("> [ERROR] No se pudo conectar con el motor de evaluación.");
+      setTerminalOutput("> [ERROR] No se pudo conectar con el motor de evaluación. Verifica tu sesión.");
     }
   };
 
@@ -93,13 +123,23 @@ const ProblemDetail: React.FC = () => {
     setTerminalOutput("> Empaquetando código y enviando a la cola de RabbitMQ...");
 
     try {
-      // ACTUALIZACIÓN: POST al API Gateway
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-      const response = await axios.post(`${apiUrl}/submissions`, {
-        studentId: 'user_jefferson',
+      const currentUser = getUserData(); 
+
+      // Armamos el paquete de datos
+      const payloadEnvio = {
+        studentId: currentUser.id, 
+        name: currentUser.name,
         problemId: problem._id || id,
         language: 'python',
         sourceCode: code
+      };
+
+      // 👇 Imprimimos en consola para que veas exactamente qué viaja al backend
+      console.log("🚀 Payload enviado al API Gateway:", payloadEnvio);
+
+      const response = await axios.post(`${apiUrl}/submissions`, payloadEnvio, {
+        headers: { Authorization: `Bearer ${getToken()}` } 
       });
 
       if (response.data.status === 'PENDING') {
@@ -117,9 +157,10 @@ const ProblemDetail: React.FC = () => {
   const pollSubmissionResult = (submissionId: string) => {
     const pollInterval = setInterval(async () => {
       try {
-        // ACTUALIZACIÓN: GET al API Gateway
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-        const res = await axios.get(`${apiUrl}/submissions/${submissionId}`);
+        const res = await axios.get(`${apiUrl}/submissions/${submissionId}`, {
+          headers: { Authorization: `Bearer ${getToken()}` }
+        });
         const data = res.data;
 
         if (data.status !== 'PENDING') {

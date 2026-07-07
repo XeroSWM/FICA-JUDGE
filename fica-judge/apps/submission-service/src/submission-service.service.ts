@@ -14,33 +14,26 @@ export class SubmissionServiceService {
 
   constructor(
     @Inject('RABBITMQ_CLIENT') private readonly rabbitClient: ClientProxy,
-    // Repositorio de PostgreSQL para el historial de envíos
-    @InjectRepository(Submission)
-    private readonly submissionRepository: Repository<Submission>,
-    // Modelo de MongoDB para leer los problemas y sus test cases secretos
-    @InjectModel(Problem.name) 
-    private readonly problemModel: Model<Problem>, 
+    @Inject('RANKING_CLIENT') private readonly rankingClient: ClientProxy, 
+    @InjectRepository(Submission) private readonly submissionRepository: Repository<Submission>,
+    @InjectModel(Problem.name) private readonly problemModel: Model<Problem>, 
   ) {
-    this.docker = new Docker({
-      host: '127.0.0.1',
-      port: 2375
-    });
+    this.docker = new Docker({ host: '127.0.0.1', port: 2375 });
   }
 
   async processNewSubmission(payload: any) {
-    // 1. Creamos y guardamos el registro inicial en Postgres
+    console.log("📥 Payload crudo llegando al Backend:", JSON.stringify(payload));
     const newSubmission = this.submissionRepository.create({
       studentId: payload.studentId || 'unknown_student',
       problemId: payload.problemId || 'unknown_problem',
       language: payload.language || 'python',
       sourceCode: payload.sourceCode,
       status: 'PENDING',
-      results: [], // Inicialmente vacío
+      results: [], 
     });
     
     const savedSubmission = await this.submissionRepository.save(newSubmission);
 
-    // 2. Inyectamos el ID (ahora un UUID o ID autoincremental de Postgres) en el evento
     const eventPayload = {
       ...payload,
       submissionId: savedSubmission.id
@@ -48,7 +41,6 @@ export class SubmissionServiceService {
 
     this.rabbitClient.emit('evaluate_code', eventPayload);
     
-    // 3. Devolvemos el ID real al Frontend
     return { 
       status: 'PENDING', 
       submissionId: savedSubmission.id,
@@ -57,37 +49,41 @@ export class SubmissionServiceService {
   }
 
   async executeSandbox(payload: any) {
-    const { sourceCode, submissionId, problemId } = payload;
+    const { sourceCode, submissionId, problemId, studentId, name } = payload;
     let cases: any[] = [];
+    let possiblePoints = 0; 
 
     // ==========================================
-    // EXTRACCIÓN DINÁMICA DE CASOS DESDE MONGODB
+    // EXTRACCIÓN DINÁMICA DE CASOS Y NORMALIZACIÓN DE DIFICULTAD
     // ==========================================
     try {
-      const problemRecord = await this.problemModel.findById(problemId);
+      // 👇 FIX 1: .lean() para traer el JSON puro sin que Mongoose lo filtre
+      const problemRecord = await this.problemModel.findById(problemId).lean();
       
-      if (!problemRecord || !problemRecord.testCases || problemRecord.testCases.length === 0) {
+      if (!problemRecord || !(problemRecord as any).testCases || (problemRecord as any).testCases.length === 0) {
         console.error(`❌ El problema ${problemId} no tiene casos de prueba en Mongo.`);
-        if (submissionId) {
-          await this.submissionRepository.update(submissionId, { 
-            status: 'SYSTEM_ERROR', 
-            results: [] 
-          });
-        }
+        if (submissionId) await this.submissionRepository.update(submissionId, { status: 'SYSTEM_ERROR', results: [] });
         return { status: 'SYSTEM_ERROR', results: [] };
       }
 
-      cases = problemRecord.testCases;
-      console.log(`👷‍♂️ WORKER: Evaluando envío [${submissionId}] - Extraídos ${cases.length} casos desde MongoDB...`);
+      cases = (problemRecord as any).testCases;
+      
+      // 👇 FIX 2: Normalizador inteligente y bilingüe
+      const rawDifficulty = String((problemRecord as any).difficulty || 'FÁCIL')
+        .toUpperCase()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .trim();
+
+      if (rawDifficulty === 'FACIL' || rawDifficulty === 'EASY') possiblePoints = 10;
+      else if (rawDifficulty === 'MEDIO' || rawDifficulty === 'MEDIUM') possiblePoints = 30;
+      else if (rawDifficulty === 'DIFICIL' || rawDifficulty === 'HARD') possiblePoints = 100;
+      else possiblePoints = 10; 
+
+      console.log(`👷‍♂️ WORKER: Evaluando envío [${submissionId}] - Dificultad cruda: ${rawDifficulty} -> ${possiblePoints} pts potenciales.`);
 
     } catch (error) {
       console.error('❌ Error conectando con MongoDB:', error);
-      if (submissionId) {
-        await this.submissionRepository.update(submissionId, { 
-          status: 'SYSTEM_ERROR', 
-          results: [] 
-        });
-      }
+      if (submissionId) await this.submissionRepository.update(submissionId, { status: 'SYSTEM_ERROR', results: [] });
       return { status: 'SYSTEM_ERROR', results: [] };
     }
 
@@ -106,26 +102,19 @@ export class SubmissionServiceService {
 
         container = await this.docker.createContainer({
           Image: 'python:3.9-slim',
-          Cmd: [
-            'sh',
-            '-c',
-            `echo "${base64Input}" | base64 -d | python3 -u -c "$(echo "${base64Code}" | base64 -d)"`
-          ],
+          Cmd: ['sh', '-c', `echo "${base64Input}" | base64 -d | python3 -u -c "$(echo "${base64Code}" | base64 -d)"`],
           Tty: false,
         });
 
         await container.start();
 
         const waitPromise = container.wait();
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('TIME_LIMIT_EXCEEDED')), 5000)
-        );
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('TIME_LIMIT_EXCEEDED')), 5000));
 
         try {
           await Promise.race([waitPromise, timeoutPromise]);
         } catch (err: any) {
           if (err.message === 'TIME_LIMIT_EXCEEDED') {
-            console.log(`⏳ Límite de tiempo excedido en el caso: "${test.input}"`);
             results.push({ input: test.input, passed: false, output: 'Time Limit Exceeded' });
             isAccepted = false;
             continue;
@@ -143,53 +132,82 @@ export class SubmissionServiceService {
           const len = outputBuffer.readUInt32BE(offset + 4);
           const chunk = outputBuffer.slice(offset + 8, offset + 8 + len).toString();
           
-          if (type === 1) { 
-            output += chunk; 
-          }
+          if (type === 1) output += chunk; 
           offset += 8 + len;
         }
         
         output = output.trim();
         const passed = output === test.expectedOutput?.toString().trim();
         
-        if (!passed) {
-          console.log(`❌ Fallo: Esperado: "${test.expectedOutput}", Recibido: "${output}"`);
-        } else {
-          console.log(`✅ Caso correcto superado.`);
-        }
-
         results.push({ input: test.input, passed, output });
         if (!passed) isAccepted = false;
 
       } catch (error) {
-        console.error('❌ Error en el Sandbox:', error);
         results.push({ input: test.input, passed: false, output: 'Error de ejecución' });
         isAccepted = false;
       } finally {
-        if (container) {
-          await container.remove({ force: true }).catch(() => {});
-        }
+        if (container) await container.remove({ force: true }).catch(() => {});
       }
     }
 
     const finalStatus = isAccepted ? 'ACCEPTED' : 'WRONG_ANSWER';
-    console.log(`✅ Envío [${submissionId}] Finalizado: ${finalStatus}`);
+    
+    // ==========================================
+    // CONTROL ESTRICTO DE INTENTOS Y ANTI-FARMEO
+    // ==========================================
+    let earnedPoints = 0;
+    let isNewSolve = false;
+    let skipAttempt = false;
 
-    // 4. ACTUALIZAMOS LA BASE DE DATOS con el veredicto final en Postgres
+    const safeStudentId = studentId || 'unknown_student';
+    const safeProblemId = problemId || 'unknown_problem';
+
+    // Consultamos si el estudiante ya registró un éxito previo en Postgres para este ejercicio
+    const previousSuccesses = await this.submissionRepository.count({
+      where: { studentId: safeStudentId, problemId: safeProblemId, status: 'ACCEPTED' }
+    });
+
+    const alreadySolvedBefore = previousSuccesses > 0;
+
+    if (finalStatus === 'ACCEPTED') {
+      if (!alreadySolvedBefore) {
+        earnedPoints = possiblePoints;
+        isNewSolve = true;
+      } else {
+        // Ya solucionado: se congela todo para proteger sus métricas
+        skipAttempt = true;
+        console.log(`ℹ️ [Sandbox] ${safeStudentId} reenvió una solución correcta a un problema ya resuelto. Protegiendo efectividad.`);
+      }
+    } else {
+      if (alreadySolvedBefore) {
+        // Si el alumno experimenta y su código falla, NO penalizamos sus intentos del ranking
+        skipAttempt = true;
+        console.log(`ℹ️ [Sandbox] ${safeStudentId} falló un intento de prueba en un problema ya solucionado. Ignorando penalización.`);
+      } else {
+        earnedPoints = 0;
+        isNewSolve = false;
+      }
+    }
+    
+    console.log(`✅ Envío [${submissionId}] Finalizado: ${finalStatus}. Puntos ganados: ${earnedPoints} | Ignorar Métricas: ${skipAttempt}`);
+
     if (submissionId) {
-      await this.submissionRepository.update(submissionId, {
+      await this.submissionRepository.update(submissionId, { status: finalStatus, results: results });
+
+      this.rankingClient.emit('submission_evaluated', {
+        studentId: safeStudentId,
+        name: name,
         status: finalStatus,
-        results: results // TypeORM serializará esto automáticamente (JSONB)
+        problemId: safeProblemId,
+        earnedPoints: earnedPoints, 
+        isNewSolve: isNewSolve,
+        skipAttempt: skipAttempt
       });
-      console.log(`💾 Guardado exitoso en Postgres para ID: ${submissionId}`);
     }
 
     return { status: finalStatus, results };
   }
 
-  // ==========================================
-  // MODO "EJECUTAR CÓDIGO" (Sin guardar en DB ni validar en Mongo)
-  // ==========================================
   async executeDirectRun(payload: any) {
     const { sourceCode, input } = payload;
     let container: any;
@@ -200,20 +218,14 @@ export class SubmissionServiceService {
 
       container = await this.docker.createContainer({
         Image: 'python:3.9-slim',
-        Cmd: [
-          'sh',
-          '-c',
-          `echo "${base64Input}" | base64 -d | python3 -u -c "$(echo "${base64Code}" | base64 -d)"`
-        ],
+        Cmd: ['sh', '-c', `echo "${base64Input}" | base64 -d | python3 -u -c "$(echo "${base64Code}" | base64 -d)"`],
         Tty: false,
       });
 
       await container.start();
 
       const waitPromise = container.wait();
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('TIME_LIMIT_EXCEEDED')), 5000)
-      );
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('TIME_LIMIT_EXCEEDED')), 5000));
 
       await Promise.race([waitPromise, timeoutPromise]);
 
@@ -226,7 +238,6 @@ export class SubmissionServiceService {
         const len = outputBuffer.readUInt32BE(offset + 4);
         const chunk = outputBuffer.slice(offset + 8, offset + 8 + len).toString();
         
-        // type 1 es stdout, type 2 es stderr (errores de python)
         output += chunk; 
         offset += 8 + len;
       }
@@ -235,13 +246,21 @@ export class SubmissionServiceService {
 
     } catch (error: any) {
       if (error.message === 'TIME_LIMIT_EXCEEDED') {
-        return { success: false, output: 'Error: Límite de tiempo excedido (Bucle infinito potencial)' };
+        return { success: false, output: 'Error: Límite de tiempo excedido' };
       }
       return { success: false, output: 'Error interno al ejecutar el sandbox.' };
     } finally {
-      if (container) {
-        await container.remove({ force: true }).catch(() => {});
-      }
+      if (container) await container.remove({ force: true }).catch(() => {});
     }
+  }
+
+  // ==========================================
+  // HISTORIAL DE ENVÍOS POR ESTUDIANTE
+  // ==========================================
+  async getHistoryByStudent(studentId: string) {
+    return await this.submissionRepository.find({
+      where: { studentId: studentId },
+      order: { id: 'DESC' }
+    });
   }
 }

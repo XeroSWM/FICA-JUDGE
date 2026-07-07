@@ -36,9 +36,12 @@ const MainLayout: React.FC = () => {
           <a href="#" className="nav-link py-2 px-3 rounded mb-1" style={{ fontSize: '0.85rem', color: '#8b949e' }}>
             <span className="me-2">🕒</span> Historial Envíos
           </a>
-          <a href="#" className="nav-link py-2 px-3 rounded mb-1" style={{ fontSize: '0.85rem', color: '#8b949e' }}>
+          
+          {/* 👇 AQUÍ ESTÁ EL CAMBIO PARA LOS RANKINGS 👇 */}
+          <Link to="/rankings" className="nav-link py-2 px-3 rounded mb-1" style={{ fontSize: '0.85rem', color: '#8b949e' }}>
             <span className="me-2">📊</span> Rankings Globales
-          </a>
+          </Link>
+
           <a href="#" className="nav-link py-2 px-3 rounded mb-1" style={{ fontSize: '0.85rem', color: '#8b949e' }}>
             <span className="me-2">🏆</span> Torneos Académicos
           </a>

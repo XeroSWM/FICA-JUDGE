@@ -43,12 +43,25 @@ const Auth: React.FC = () => {
           password: formData.password
         });
 
-        // 1. Guardamos el token y los datos del usuario en el navegador
-        localStorage.setItem('fj_token', response.data.token);
-        localStorage.setItem('fj_user', JSON.stringify(response.data.user));
+        // 1. Guardamos el token 
+        const tokenReal = response.data.token || response.data.access_token;
+        localStorage.setItem('fj_token', tokenReal);
+
+        // 👇 APLICAMOS EL PARCHE RÁPIDO: Rescate de identidad
+        const userData = response.data.user || {};
+        const userToSave = {
+            ...userData,
+            email: userData.email || formData.email, // Forzamos a guardar el email escrito
+            firstName: userData.firstName || formData.firstName || 'Nuevo',
+            lastName: userData.lastName || formData.lastName || 'Usuario'
+        };
+        
+        // Guardamos el usuario "rescatado"
+        localStorage.setItem('fj_user', JSON.stringify(userToSave));
 
         setMessage({ 
-          text: `¡Bienvenido de vuelta, ${response.data.user.firstName}! Autenticación exitosa.`, 
+          // Usamos el nombre rescatado para el mensaje
+          text: `¡Bienvenido de vuelta, ${userToSave.firstName}! Autenticación exitosa.`, 
           type: 'success' 
         });
 
