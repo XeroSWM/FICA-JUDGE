@@ -2,7 +2,7 @@ import { Controller, Post, Get, Body, Param, Res, UseGuards, Req } from '@nestjs
 import { HttpService } from '@nestjs/axios';
 import type { Response, Request } from 'express';
 import { firstValueFrom } from 'rxjs';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard'; // 👈 Importamos al guardia
+import { JwtAuthGuard } from '../auth/jwt-auth.guard'; 
 
 @Controller('submissions')
 export class SubmissionController {
@@ -15,15 +15,17 @@ export class SubmissionController {
   @Post()
   async createSubmission(@Body() body: any, @Req() req: any, @Res() res: Response) {
     try {
-      // Como pasó el Guardia, req.user tiene los datos del JWT descifrados
-      const user = req.user; 
+      const user = req.user || {}; 
 
-      // INYECCIÓN SEGURA: Reemplazamos cualquier cosa que el frontend intente mandar
-      // como 'studentId' por el correo/ID real del usuario logueado.
+      // 👇 FIX: Respetamos los datos que envía el frontend (body). 
+      // Si por alguna razón el frontend falla, usamos el JWT (user) como plan B.
       const payloadSeguro = {
         ...body,
-        studentId: user.email // O user.userId, dependiendo de qué quieres guardar en Postgres
+        studentId: body.studentId || user.email || user.sub || 'unknown_student',
+        name: body.name || user.firstName || 'Estudiante FICA'
       };
+
+      console.log('🚀 GATEWAY ENVIANDO AL MICROSERVICIO:', payloadSeguro);
 
       const response = await firstValueFrom(this.httpService.post(this.SUBMISSION_URL, payloadSeguro));
       return res.status(response.status).json(response.data);
