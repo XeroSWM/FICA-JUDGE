@@ -253,4 +253,14 @@ export class SubmissionServiceService {
       if (container) await container.remove({ force: true }).catch(() => {});
     }
   }
+
+  // ==========================================
+  // HISTORIAL DE ENVÍOS POR ESTUDIANTE
+  // ==========================================
+  async getHistoryByStudent(studentId: string) {
+    return await this.submissionRepository.find({
+      where: { studentId: studentId },
+      order: { id: 'DESC' }
+    });
+  }
 }
