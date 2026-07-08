@@ -17,7 +17,7 @@ export class SubmissionController {
     try {
       const user = req.user || {}; 
 
-      // 👇 FIX: Respetamos los datos que envía el frontend (body). 
+      // FIX: Respetamos los datos que envía el frontend (body). 
       // Si por alguna razón el frontend falla, usamos el JWT (user) como plan B.
       const payloadSeguro = {
         ...body,
@@ -31,6 +31,25 @@ export class SubmissionController {
       return res.status(response.status).json(response.data);
     } catch (error: any) {
       return res.status(error.response?.status || 500).json(error.response?.data || { message: 'Submission Service inalcanzable' });
+    }
+  }
+
+  // 🔒 NUEVA RUTA: Historial del usuario
+  // ¡IMPORTANTE! Esta ruta debe ir ANTES de @Get(':id')
+  @UseGuards(JwtAuthGuard)
+  @Get('history/me')
+  async getMyHistory(@Req() req: any, @Res() res: Response) {
+    try {
+      const user = req.user || {};
+      const studentId = user.email || user.sub || 'unknown_student';
+      
+      console.log(`🔍 Buscando historial para: ${studentId}`);
+
+      const response = await firstValueFrom(this.httpService.get(`${this.SUBMISSION_URL}/history/${studentId}`));
+      return res.status(200).json(response.data);
+    } catch (error: any) {
+      console.error("Error al obtener historial:", error.message);
+      return res.status(error.response?.status || 500).json({ message: 'Error obteniendo historial' });
     }
   }
 

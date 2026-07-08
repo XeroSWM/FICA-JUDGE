@@ -6,11 +6,11 @@ import Dashboard from './pages/Dashboard';
 import ProblemList from './pages/ProblemList';
 import ProblemDetail from './pages/ProblemDetail'; 
 import CreateProblem from './components/CreateProblem';
-import RankingsGlobales from './pages/Rankings';// <-- 1. IMPORTAMOS LA NUEVA VISTA
+import RankingsGlobales from './pages/Rankings';
+import HistorialEnvios from './pages/HistorialEnvios'; // <-- IMPORTADO
 import React from 'react';
 
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
-  // Asegúrate de que el nombre del token aquí ('fj_token' o 'token') coincida con el que usas en el Login y en el componente RankingsGlobales
   const token = localStorage.getItem('fj_token');
   return token ? children : <Navigate to="/" />;
 };
@@ -28,8 +28,9 @@ function App() {
           <Route path="/problems/new" element={<CreateProblem />} />
           <Route path="/problems/:id" element={<ProblemDetail />} />
           
-          {/* <-- 2. NUEVA RUTA PARA EL LEADERBOARD --> */}
+          {/* RUTAS DE ESTUDIANTE */}
           <Route path="/rankings" element={<RankingsGlobales />} />
+          <Route path="/historial" element={<HistorialEnvios />} /> {/* <-- RUTA AGREGADA */}
         </Route>
       </Routes>
     </Router>
