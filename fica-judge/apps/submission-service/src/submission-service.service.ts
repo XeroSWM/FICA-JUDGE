@@ -49,16 +49,16 @@ export class SubmissionServiceService {
   }
 
   async executeSandbox(payload: any) {
-    const { sourceCode, submissionId, problemId, studentId, name } = payload;
+    const { sourceCode, submissionId, problemId, studentId, name, language } = payload;
     let cases: any[] = [];
     let possiblePoints = 0; 
+    let problemRecord: any = null;
 
     // ==========================================
     // EXTRACCIÓN DINÁMICA DE CASOS Y NORMALIZACIÓN DE DIFICULTAD
     // ==========================================
     try {
-      // 👇 FIX 1: .lean() para traer el JSON puro sin que Mongoose lo filtre
-      const problemRecord = await this.problemModel.findById(problemId).lean();
+      problemRecord = await this.problemModel.findById(problemId).lean();
       
       if (!problemRecord || !(problemRecord as any).testCases || (problemRecord as any).testCases.length === 0) {
         console.error(`❌ El problema ${problemId} no tiene casos de prueba en Mongo.`);
@@ -68,7 +68,6 @@ export class SubmissionServiceService {
 
       cases = (problemRecord as any).testCases;
       
-      // 👇 FIX 2: Normalizador inteligente y bilingüe
       const rawDifficulty = String((problemRecord as any).difficulty || 'FÁCIL')
         .toUpperCase()
         .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
@@ -89,6 +88,7 @@ export class SubmissionServiceService {
 
     const results: any[] = []; 
     let isAccepted = true;
+    const lang = language || 'python';
 
     // ==========================================
     // EJECUCIÓN DEL CÓDIGO EN DOCKER (SANDBOX)
@@ -97,7 +97,28 @@ export class SubmissionServiceService {
       let container: any;
       
       try {
-        const base64Code = Buffer.from(sourceCode).toString('base64');
+        // 👇 INYECCIÓN DE BOILERPLATE (WRAPPER)
+        let finalCode = sourceCode;
+
+        if (problemRecord && problemRecord.hiddenWrapper) {
+          // Opción 1: Si el problema en Mongo tiene un wrapper oculto dinámico
+          finalCode = `${sourceCode}\n\n${problemRecord.hiddenWrapper}`;
+        } else if (lang === 'python' || lang === 'python3') {
+          // Opción 2: Fallback específico para el problema "Rate Limiter"
+          const hiddenWrapper = `
+import sys
+if __name__ == '__main__':
+    entrada = sys.stdin.read().split()
+    if len(entrada) > 1:
+        n = int(entrada[0])
+        timestamps = [int(x) for x in entrada[1:]]
+        solucion = Solution()
+        print(solucion.rate_limiter(n, timestamps))
+`;
+          finalCode = `${sourceCode}\n${hiddenWrapper}`;
+        }
+
+        const base64Code = Buffer.from(finalCode).toString('base64');
         const base64Input = Buffer.from(test.input || '').toString('base64');
 
         container = await this.docker.createContainer({
@@ -162,7 +183,6 @@ export class SubmissionServiceService {
     const safeStudentId = studentId || 'unknown_student';
     const safeProblemId = problemId || 'unknown_problem';
 
-    // Consultamos si el estudiante ya registró un éxito previo en Postgres para este ejercicio
     const previousSuccesses = await this.submissionRepository.count({
       where: { studentId: safeStudentId, problemId: safeProblemId, status: 'ACCEPTED' }
     });
@@ -174,13 +194,11 @@ export class SubmissionServiceService {
         earnedPoints = possiblePoints;
         isNewSolve = true;
       } else {
-        // Ya solucionado: se congela todo para proteger sus métricas
         skipAttempt = true;
         console.log(`ℹ️ [Sandbox] ${safeStudentId} reenvió una solución correcta a un problema ya resuelto. Protegiendo efectividad.`);
       }
     } else {
       if (alreadySolvedBefore) {
-        // Si el alumno experimenta y su código falla, NO penalizamos sus intentos del ranking
         skipAttempt = true;
         console.log(`ℹ️ [Sandbox] ${safeStudentId} falló un intento de prueba en un problema ya solucionado. Ignorando penalización.`);
       } else {
@@ -209,11 +227,29 @@ export class SubmissionServiceService {
   }
 
   async executeDirectRun(payload: any) {
-    const { sourceCode, input } = payload;
+    const { sourceCode, input, language } = payload;
     let container: any;
+    const lang = language || 'python';
     
     try {
-      const base64Code = Buffer.from(sourceCode).toString('base64');
+      // 👇 INYECCIÓN DE BOILERPLATE PARA EJECUCIÓN DIRECTA
+      let finalCode = sourceCode;
+
+      if (lang === 'python' || lang === 'python3') {
+        const hiddenWrapper = `
+import sys
+if __name__ == '__main__':
+    entrada = sys.stdin.read().split()
+    if len(entrada) > 1:
+        n = int(entrada[0])
+        timestamps = [int(x) for x in entrada[1:]]
+        solucion = Solution()
+        print(solucion.rate_limiter(n, timestamps))
+`;
+        finalCode = `${sourceCode}\n${hiddenWrapper}`;
+      }
+
+      const base64Code = Buffer.from(finalCode).toString('base64');
       const base64Input = Buffer.from(input || '').toString('base64');
 
       container = await this.docker.createContainer({

@@ -34,9 +34,14 @@ const HistorialEnvios: React.FC = () => {
       const token = localStorage.getItem('fj_token');
       const headers = { Authorization: `Bearer ${token}` };
 
+      // 👇 EXTRAEMOS TU CORREO REAL DE LA MEMORIA DEL NAVEGADOR
+      const userLocal = JSON.parse(localStorage.getItem('fj_user') || '{}');
+      const myEmail = userLocal.email || 'unknown_student'; 
+
       try {
         const [subsRes, probsRes] = await Promise.all([
-          axios.get(`${apiUrl}/submissions/history/me`, { headers }),
+          // 👇 LE ENVIAMOS EL CORREO EXACTO AL GATEWAY
+          axios.get(`${apiUrl}/submissions/history/${myEmail}`, { headers }),
           axios.get(`${apiUrl}/problems`, { headers }).catch(() => ({ data: [] }))
         ]);
 

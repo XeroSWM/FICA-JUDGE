@@ -67,13 +67,16 @@ export class SubmissionController {
 
   // 🔒 PROTEGEMOS LA CONSULTA DE RESULTADOS
   @UseGuards(JwtAuthGuard)
-  @Get(':id')
-  async getSubmissionStatus(@Param('id') id: string, @Res() res: Response) {
+  @Get('history/:studentId')
+  async getStudentHistory(@Param('studentId') studentId: string, @Res() res: Response) {
     try {
-      const response = await firstValueFrom(this.httpService.get(`${this.SUBMISSION_URL}/${id}`));
-      return res.status(response.status).json(response.data);
+      console.log(`🔍 Buscando historial exacto para: ${studentId}`);
+
+      const response = await firstValueFrom(this.httpService.get(`${this.SUBMISSION_URL}/history/${studentId}`));
+      return res.status(200).json(response.data);
     } catch (error: any) {
-      return res.status(error.response?.status || 404).json(error.response?.data || { message: 'Envío no encontrado' });
+      console.error("Error al obtener historial:", error.message);
+      return res.status(error.response?.status || 500).json({ message: 'Error obteniendo historial' });
     }
   }
 }
