@@ -44,7 +44,7 @@ const MainLayout: React.FC = () => {
           </Link>
 
           <a href="#" className="nav-link py-2 px-3 rounded mb-1" style={{ fontSize: '0.85rem', color: '#8b949e' }}>
-            <span className="me-2">🏆</span> Torneos Académicos
+            <span className="me-2"></span> Deberes y Examenes
           </a>
           <a href="#" className="nav-link py-2 px-3 rounded mb-1" style={{ fontSize: '0.85rem', color: '#8b949e' }}>
             <span className="me-2">👤</span> Mi Perfil de Usuario
