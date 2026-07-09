@@ -20,7 +20,7 @@ const AssignmentsList: React.FC = () => {
   useEffect(() => {
     const fetchAssignments = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('fj_token');
         const response = await axios.get(`${import.meta.env.VITE_API_URL}/assignments`, {
           headers: { Authorization: `Bearer ${token}` }
         });
@@ -40,51 +40,84 @@ const AssignmentsList: React.FC = () => {
   };
 
   if (loading) {
-    return <div className="flex h-screen items-center justify-center bg-[#0d1117] text-white">Cargando evaluaciones...</div>;
+    return (
+      <div className="d-flex justify-content-center align-items-center w-100" style={{ height: '80vh', color: '#c9d1d9' }}>
+        <div className="spinner-border text-success" role="status">
+          <span className="visually-hidden">Cargando...</span>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-[#0d1117] p-8 text-gray-300">
-      <div className="mb-8 border-b border-gray-700 pb-4">
-        <h1 className="text-3xl font-bold text-white">Deberes y Exámenes Prácticos</h1>
-        <p className="mt-2 text-sm text-gray-400">Selecciona una evaluación para comenzar. Ten en cuenta las fechas límite.</p>
+    <div className="container-fluid py-4" style={{ color: '#c9d1d9' }}>
+      <div className="mb-4" style={{ borderBottom: '1px solid #30363d', paddingBottom: '15px' }}>
+        <h2 className="fw-bold text-white mb-1">Deberes y Exámenes Prácticos</h2>
+        <p style={{ color: '#8b949e', fontSize: '0.9rem' }}>Selecciona una evaluación para comenzar. Ten en cuenta las fechas límite marcadas por el sistema.</p>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {assignments.map((assignment) => {
-          const isOpen = isAssignmentOpen(assignment.startDate, assignment.endDate);
-          
-          return (
-            <div key={assignment.id} className="flex flex-col rounded-lg border border-gray-700 bg-[#161b22] p-6 shadow-lg transition-transform hover:-translate-y-1">
-              <div className="mb-4 flex items-center justify-between">
-                <span className={`rounded px-2 py-1 text-xs font-semibold tracking-wider ${assignment.type === 'EXAMEN' ? 'bg-red-900/50 text-red-400' : 'bg-blue-900/50 text-blue-400'}`}>
-                  {assignment.type}
-                </span>
-                <span className="text-sm font-medium text-gray-400">Max: {assignment.maxScore} pts</span>
-              </div>
-              
-              <h2 className="mb-4 text-xl font-bold text-white">{assignment.title}</h2>
-              
-              <div className="mb-6 flex flex-col space-y-2 text-sm text-gray-400">
-                <p><strong>Apertura:</strong> {new Date(assignment.startDate).toLocaleString()}</p>
-                <p><strong>Cierre:</strong> {new Date(assignment.endDate).toLocaleString()}</p>
-                <p className="text-yellow-500"><strong>Penalización:</strong> -{assignment.penaltyPerAttempt} pts por fallo</p>
-              </div>
-
-              <button
-                onClick={() => navigate(`/assignments/${assignment.id}`)}
-                disabled={!isOpen}
-                className={`mt-auto rounded-md px-4 py-2 font-bold transition-colors ${
-                  isOpen 
-                    ? 'bg-green-600 text-white hover:bg-green-500' 
-                    : 'cursor-not-allowed bg-gray-700 text-gray-500'
-                }`}
-              >
-                {isOpen ? 'Ingresar a la Evaluación' : 'Fuera de Fecha'}
-              </button>
+      <div className="row">
+        {assignments.length === 0 ? (
+          <div className="col-12">
+            <div className="p-4 rounded text-center" style={{ backgroundColor: '#161b22', border: '1px solid #30363d' }}>
+              <p style={{ color: '#8b949e', margin: 0 }}>No hay deberes ni exámenes asignados en este momento.</p>
             </div>
-          );
-        })}
+          </div>
+        ) : (
+          assignments.map((assignment) => {
+            const isOpen = isAssignmentOpen(assignment.startDate, assignment.endDate);
+            
+            return (
+              <div className="col-md-6 col-lg-4 mb-4" key={assignment.id}>
+                <div className="d-flex flex-column p-4 h-100" style={{ 
+                  backgroundColor: '#161b22', 
+                  border: '1px solid #30363d', 
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 6px rgba(0,0,0,0.3)'
+                }}>
+                  
+                  <div className="d-flex justify-content-between align-items-center mb-3">
+                    <span style={{ 
+                      backgroundColor: assignment.type === 'EXAMEN' ? 'rgba(248, 81, 73, 0.15)' : 'rgba(56, 139, 253, 0.15)', 
+                      color: assignment.type === 'EXAMEN' ? '#ff7b72' : '#58a6ff',
+                      padding: '2px 8px', 
+                      borderRadius: '4px', 
+                      fontSize: '0.75rem', 
+                      fontWeight: 'bold',
+                      letterSpacing: '0.5px'
+                    }}>
+                      {assignment.type}
+                    </span>
+                    <span style={{ fontSize: '0.85rem', color: '#8b949e', fontWeight: 'bold' }}>Max: {assignment.maxScore} pts</span>
+                  </div>
+                  
+                  <h4 className="text-white fw-bold mb-3">{assignment.title}</h4>
+                  
+                  <div className="mb-4 flex-grow-1" style={{ fontSize: '0.85rem', color: '#8b949e' }}>
+                    <div className="mb-2"><strong className="text-white">Apertura:</strong> {new Date(assignment.startDate).toLocaleString()}</div>
+                    <div className="mb-2"><strong className="text-white">Cierre:</strong> {new Date(assignment.endDate).toLocaleString()}</div>
+                    <div style={{ color: '#d29922' }}><strong>Penalización:</strong> -{assignment.penaltyPerAttempt} pts por fallo</div>
+                  </div>
+
+                  <button
+                    onClick={() => navigate(`/assignments/${assignment.id}`)}
+                    disabled={!isOpen}
+                    className="btn w-100 fw-bold"
+                    style={{ 
+                      backgroundColor: isOpen ? '#238636' : '#21262d', 
+                      color: isOpen ? '#ffffff' : '#8b949e',
+                      border: isOpen ? '1px solid rgba(240, 246, 252, 0.1)' : '1px solid #30363d',
+                      padding: '8px 16px',
+                      cursor: isOpen ? 'pointer' : 'not-allowed'
+                    }}
+                  >
+                    {isOpen ? 'Ingresar a la Evaluación' : 'Fuera de Fecha'}
+                  </button>
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
     </div>
   );
