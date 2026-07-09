@@ -101,19 +101,17 @@ export class SubmissionServiceService {
         let finalCode = sourceCode;
 
         if (problemRecord && problemRecord.hiddenWrapper) {
-          // Opción 1: Si el problema en Mongo tiene un wrapper oculto dinámico
           finalCode = `${sourceCode}\n\n${problemRecord.hiddenWrapper}`;
         } else if (lang === 'python' || lang === 'python3') {
-          // Opción 2: Fallback específico para el problema "Rate Limiter"
+          // Wrapper ajustado para longest_thermal_runaway
           const hiddenWrapper = `
 import sys
 if __name__ == '__main__':
     entrada = sys.stdin.read().split()
-    if len(entrada) > 1:
-        n = int(entrada[0])
-        timestamps = [int(x) for x in entrada[1:]]
+    if entrada:
+        valores = [int(x) for x in entrada]
         solucion = Solution()
-        print(solucion.rate_limiter(n, timestamps))
+        print(solucion.longest_thermal_runaway(valores))
 `;
           finalCode = `${sourceCode}\n${hiddenWrapper}`;
         }
@@ -236,15 +234,15 @@ if __name__ == '__main__':
       let finalCode = sourceCode;
 
       if (lang === 'python' || lang === 'python3') {
+        // Wrapper ajustado para longest_thermal_runaway
         const hiddenWrapper = `
 import sys
 if __name__ == '__main__':
     entrada = sys.stdin.read().split()
-    if len(entrada) > 1:
-        n = int(entrada[0])
-        timestamps = [int(x) for x in entrada[1:]]
+    if entrada:
+        valores = [int(x) for x in entrada]
         solucion = Solution()
-        print(solucion.rate_limiter(n, timestamps))
+        print(solucion.longest_thermal_runaway(valores))
 `;
         finalCode = `${sourceCode}\n${hiddenWrapper}`;
       }
@@ -298,5 +296,20 @@ if __name__ == '__main__':
       where: { studentId: studentId },
       order: { id: 'DESC' }
     });
+  }
+
+  // ==========================================
+  // CONSULTAR UN ENVÍO ESPECÍFICO POR ID
+  // ==========================================
+  async getSubmissionById(id: string) {
+    const submission = await this.submissionRepository.findOne({
+      where: { id: id }
+    });
+    
+    if (!submission) {
+      return { status: 'NOT_FOUND', message: 'Envío no encontrado' };
+    }
+    
+    return submission;
   }
 }

@@ -79,4 +79,31 @@ export class SubmissionController {
       return res.status(error.response?.status || 500).json({ message: 'Error obteniendo historial' });
     }
   }
+
+  // 👇 ==========================================
+  // NUEVO PUENTE: CONSULTAR ESTADO DE UN ENVÍO POR ID
+  // ==========================================
+  @UseGuards(JwtAuthGuard)
+  @Get(':id')
+  async getSubmissionById(@Param('id') id: string, @Res() res: Response) {
+    try {
+      // 1. El Gateway redirige la petición al microservicio
+      const response = await firstValueFrom(
+        this.httpService.get(`${this.SUBMISSION_URL}/${id}`)
+      );
+      
+      // 2. Si el microservicio responde que no existe
+      if (response.data?.status === 'NOT_FOUND') {
+        return res.status(404).json({ message: 'Envío no encontrado' });
+      }
+
+      // 3. Se lo devolvemos al Frontend
+      return res.status(200).json(response.data);
+    } catch (error: any) {
+      console.error(`Error consultando el envío ${id} en el Gateway:`, error.message);
+      return res.status(error.response?.status || 500).json({ 
+        message: 'Error al consultar el estado del envío' 
+      });
+    }
+  }
 }
