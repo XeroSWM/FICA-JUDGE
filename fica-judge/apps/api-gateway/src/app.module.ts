@@ -5,7 +5,7 @@ import { CatalogController } from './proxy/catalog.controller';
 import { SubmissionController } from './proxy/submission.controller';
 import { JwtStrategy } from './auth/jwt.strategy';
 import { RankingController } from './proxy/ranking.controller';
-import { AssignmentController } from './assignment.controller';
+import { AssignmentController } from './proxy/assignment.controller';
 
 @Module({
   imports: [

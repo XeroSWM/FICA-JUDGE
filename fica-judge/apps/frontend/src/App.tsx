@@ -7,7 +7,9 @@ import ProblemList from './pages/ProblemList';
 import ProblemDetail from './pages/ProblemDetail'; 
 import CreateProblem from './components/CreateProblem';
 import RankingsGlobales from './pages/Rankings';
-import HistorialEnvios from './pages/HistorialEnvios'; // <-- IMPORTADO
+import HistorialEnvios from './pages/HistorialEnvios';
+import AssignmentsList from './pages/AssignmentsList'; // <-- IMPORTADO
+import AssignmentDetail from './pages/AssignmentDetail'; // <-- IMPORTADO
 import React from 'react';
 
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
@@ -28,9 +30,13 @@ function App() {
           <Route path="/problems/new" element={<CreateProblem />} />
           <Route path="/problems/:id" element={<ProblemDetail />} />
           
+          {/* RUTAS DE DEBERES Y EXÁMENES */}
+          <Route path="/assignments" element={<AssignmentsList />} /> {/* <-- RUTA AGREGADA */}
+          <Route path="/assignments/:id" element={<AssignmentDetail />} /> {/* <-- RUTA AGREGADA */}
+          
           {/* RUTAS DE ESTUDIANTE */}
           <Route path="/rankings" element={<RankingsGlobales />} />
-          <Route path="/historial" element={<HistorialEnvios />} /> {/* <-- RUTA AGREGADA */}
+          <Route path="/historial" element={<HistorialEnvios />} /> 
         </Route>
       </Routes>
     </Router>

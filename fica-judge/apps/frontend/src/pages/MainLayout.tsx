@@ -34,7 +34,6 @@ const MainLayout: React.FC = () => {
             <span className="me-2">📖</span> Ver Problemas
           </Link>
           
-          {/* 👇 ENLACE AL HISTORIAL ACTIVADO 👇 */}
           <Link to="/historial" className="nav-link py-2 px-3 rounded mb-1" style={{ fontSize: '0.85rem', color: '#8b949e' }}>
             <span className="me-2">🕒</span> Historial Envíos
           </Link>
@@ -43,9 +42,11 @@ const MainLayout: React.FC = () => {
             <span className="me-2">📊</span> Rankings Globales
           </Link>
 
-          <a href="#" className="nav-link py-2 px-3 rounded mb-1" style={{ fontSize: '0.85rem', color: '#8b949e' }}>
-            <span className="me-2"></span> Deberes y Examenes
-          </a>
+          {/* 👇 ENLACE A DEBERES Y EXÁMENES ACTIVADO 👇 */}
+          <Link to="/assignments" className="nav-link py-2 px-3 rounded mb-1" style={{ fontSize: '0.85rem', color: '#8b949e' }}>
+            <span className="me-2">📝</span> Deberes y Exámenes
+          </Link>
+
           <a href="#" className="nav-link py-2 px-3 rounded mb-1" style={{ fontSize: '0.85rem', color: '#8b949e' }}>
             <span className="me-2">👤</span> Mi Perfil de Usuario
           </a>
