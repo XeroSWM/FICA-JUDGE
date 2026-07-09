@@ -19,6 +19,15 @@
         "tsConfigPath": "apps/api-gateway/tsconfig.app.json"
       }
     },
+    "assignment-service": {
+      "type": "application",
+      "root": "apps/assignment-service",
+      "entryFile": "main",
+      "sourceRoot": "apps/assignment-service/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/assignment-service/tsconfig.app.json"
+      }
+    },
     "fica-judge": {
       "type": "application",
       "root": "apps/fica-judge",

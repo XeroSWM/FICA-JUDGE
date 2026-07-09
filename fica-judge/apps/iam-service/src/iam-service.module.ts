@@ -22,9 +22,12 @@ const CommandHandlers = [RegisterUserHandler, LoginUserHandler];
       type: 'postgres',
       host: process.env.DB_HOST || 'localhost',
       port: parseInt(process.env.DB_PORT || '5432', 10),
-      username: process.env.DB_USERNAME || 'iam_user',
-      password: process.env.DB_PASSWORD || 'iam_password',
-      database: process.env.DB_NAME || 'iam_db',
+      
+      // 👇 APLICAMOS LAS CREDENCIALES DEL CONTENEDOR UNIFICADO
+      username: process.env.DB_USERNAME || 'postgres',
+      password: process.env.DB_PASSWORD || 'password',
+      database: process.env.DB_NAME || 'fica_judge_iam',
+      
       entities: [User],
       synchronize: true,
       ssl: process.env.DB_HOST ? { rejectUnauthorized: false } : false,

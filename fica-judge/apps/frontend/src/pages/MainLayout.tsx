@@ -8,11 +8,11 @@ const MainLayout: React.FC = () => {
     <div className="d-flex w-100" style={{ minHeight: '100vh', backgroundColor: '#0d1117', color: '#c9d1d9', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
       
       {/* ========================================================== */}
-      {/* 1. BARRA LATERAL (SIDEBAR) APAGADO (Nada seleccionado)     */}
+      {/* 1. BARRA LATERAL (SIDEBAR)                                 */}
       {/* ========================================================== */}
       <aside style={{ width: '260px', backgroundColor: '#010409', borderRight: '1px solid #30363d', minWidth: '260px' }} className="d-flex flex-column p-3">
         
-        {/* Header del Sidebar (Clickeable para regresar al inicio) */}
+        {/* Header del Sidebar */}
         <Link to="/inicio" className="d-flex align-items-center mb-4 mt-2 text-decoration-none" style={{ cursor: 'pointer' }}>
           <div style={{ backgroundColor: '#238636', color: '#fff', fontWeight: 'bold', padding: '5px 10px', borderRadius: '4px', marginRight: '10px', fontSize: '0.9rem' }}>FJ</div>
           <div>
@@ -33,17 +33,18 @@ const MainLayout: React.FC = () => {
           <Link to="/problems" className="nav-link py-2 px-3 rounded mb-1" style={{ fontSize: '0.85rem', color: '#8b949e' }}>
             <span className="me-2">📖</span> Ver Problemas
           </Link>
-          <a href="#" className="nav-link py-2 px-3 rounded mb-1" style={{ fontSize: '0.85rem', color: '#8b949e' }}>
-            <span className="me-2">🕒</span> Historial Envíos
-          </a>
           
-          {/* 👇 AQUÍ ESTÁ EL CAMBIO PARA LOS RANKINGS 👇 */}
+          {/* 👇 ENLACE AL HISTORIAL ACTIVADO 👇 */}
+          <Link to="/historial" className="nav-link py-2 px-3 rounded mb-1" style={{ fontSize: '0.85rem', color: '#8b949e' }}>
+            <span className="me-2">🕒</span> Historial Envíos
+          </Link>
+          
           <Link to="/rankings" className="nav-link py-2 px-3 rounded mb-1" style={{ fontSize: '0.85rem', color: '#8b949e' }}>
             <span className="me-2">📊</span> Rankings Globales
           </Link>
 
           <a href="#" className="nav-link py-2 px-3 rounded mb-1" style={{ fontSize: '0.85rem', color: '#8b949e' }}>
-            <span className="me-2">🏆</span> Torneos Académicos
+            <span className="me-2"></span> Deberes y Examenes
           </a>
           <a href="#" className="nav-link py-2 px-3 rounded mb-1" style={{ fontSize: '0.85rem', color: '#8b949e' }}>
             <span className="me-2">👤</span> Mi Perfil de Usuario
@@ -74,14 +75,11 @@ const MainLayout: React.FC = () => {
       </aside>
 
       {/* ========================================================== */}
-      {/* 2. AREA DE CONTENIDO (HEADER LIMPIO + OUTLET CENTRAL)       */}
+      {/* 2. AREA DE CONTENIDO                                       */}
       {/* ========================================================== */}
       <main className="flex-grow-1 d-flex flex-column" style={{ overflowX: 'hidden' }}>
         
-        {/* Barra Superior (Topbar) LIMPIA */}
         <header className="d-flex justify-content-between align-items-center p-3" style={{ borderBottom: '1px solid #30363d', backgroundColor: '#0d1117' }}>
-          
-          {/* Lado Izquierdo: Solo el buscador */}
           <div className="d-flex align-items-center flex-grow-1 me-3">
             <input 
               type="text" 
@@ -91,21 +89,15 @@ const MainLayout: React.FC = () => {
             />
           </div>
           
-          {/* Lado Derecho: Solo Rol y Perfil */}
           <div className="d-flex align-items-center">
             <span className="me-3" style={{ color: '#8b949e', fontSize: '0.8rem' }}>● Rol: Estudiante ▼</span>
-
             <div className="d-flex align-items-center" style={{ padding: '2px 10px', backgroundColor: '#161b22', borderRadius: '20px', border: '1px solid #30363d' }}>
               <div className="rounded-circle bg-secondary me-2" style={{ width: '24px', height: '24px' }}></div>
               <span style={{ fontSize: '0.8rem', fontWeight: 'bold' }} className="text-white">JEFFERSON</span>
             </div>
           </div>
-
         </header>
 
-        {/* ========================================================== */}
-        {/* 3. OUTLET: Aquí se inyectan tus vistas aisladas            */}
-        {/* ========================================================== */}
         <div className="p-4 flex-grow-1" style={{ overflowY: 'auto' }}>
           <Outlet />
         </div>

@@ -9,14 +9,14 @@ import { Problem, ProblemSchema } from './schemas/problem.schema';
 
 @Module({
   imports: [
-    // 1. Conexión a la nueva base de datos exclusiva del Submission Service
+    // 1. Conexión a la base de datos exclusiva del Submission Service en el contenedor unificado
     TypeOrmModule.forRoot({
       type: 'postgres',
       host: 'localhost',
-      port: 5433, 
-      username: 'submission_user', 
-      password: 'submission_password', 
-      database: 'submission_db', 
+      port: 5432, // 👈 Puerto centralizado
+      username: 'postgres', // 👈 Credenciales unificadas
+      password: 'password',
+      database: 'fica_judge_submissions', // 👈 Base de datos lógica aislada
       entities: [Submission],
       synchronize: true, 
     }),
@@ -31,7 +31,7 @@ import { Problem, ProblemSchema } from './schemas/problem.schema';
     // 4. Conexión a RabbitMQ
     ClientsModule.register([
       {
-        name: 'RABBITMQ_CLIENT', // El original que ya tenías
+        name: 'RABBITMQ_CLIENT', 
         transport: Transport.RMQ,
         options: {
           urls: ['amqp://admin:admin123@localhost:5672'],
@@ -41,7 +41,7 @@ import { Problem, ProblemSchema } from './schemas/problem.schema';
           },
         },
       },
-      // 👇 EL NUEVO MEGÁFONO PARA AVISARLE AL TABLERO DE POSICIONES
+      // MEGÁFONO PARA AVISARLE AL TABLERO DE POSICIONES
       {
         name: 'RANKING_CLIENT', 
         transport: Transport.RMQ,
