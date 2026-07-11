@@ -8,14 +8,14 @@ WORKDIR /usr/src/app
 # Copiamos los archivos de configuración desde la raíz del monorepo
 COPY package*.json tsconfig*.json nest-cli.json ./
 
-# Instalamos TODAS las dependencias
+# Instalamos TODAS las dependencias de desarrollo y producción
 RUN npm install
 
 # Copiamos todo el código fuente del monorepo
 COPY . .
 
-# Compilamos específicamente el microservicio de catálogo
-RUN npm run build problem-catalog-service
+# Compilamos específicamente el microservicio de asignaciones
+RUN npm run build assignment-service
 
 # ==========================================
 # 2. ETAPA DE PRODUCCIÓN (RUNNER)
@@ -24,21 +24,17 @@ FROM node:18-alpine
 
 WORKDIR /usr/src/app
 
-# Copiamos solo el package.json
+# Copiamos solo el package.json para las dependencias finales
 COPY package*.json ./
 
-# Instalamos SOLO dependencias de producción
-RUN npm install --only=production
+# Instalamos SOLO dependencias de producción para mantener la imagen ligera
+RUN npm install --omit=dev
 
 # Traemos SOLO el código compilado de este microservicio
-COPY --from=builder /usr/src/app/dist/apps/problem-catalog-service ./dist
+COPY --from=builder /usr/src/app/dist/apps/assignment-service ./dist
 
-# Variables de entorno
-ENV NODE_ENV=production
-ENV CATALOG_PORT=3002
+# Exponemos el puerto en el que corre tu servicio de deberes y exámenes
+EXPOSE 3005
 
-# Exponemos el puerto
-EXPOSE 3002
-
-# Ejecutamos el servicio
+# Ejecutamos el punto de entrada del microservicio
 CMD ["node", "dist/main.js"]

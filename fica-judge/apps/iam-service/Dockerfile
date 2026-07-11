@@ -1,7 +1,7 @@
 # ==========================================
 # 1. ETAPA DE CONSTRUCCIÓN (BUILDER)
 # ==========================================
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
 WORKDIR /usr/src/app
 
@@ -14,13 +14,13 @@ RUN npm install
 # Copiamos todo el código fuente del monorepo
 COPY . .
 
-# Compilamos específicamente el microservicio de catálogo
-RUN npm run build problem-catalog-service
+# Compilamos específicamente el microservicio IAM
+RUN npm run build iam-service
 
 # ==========================================
 # 2. ETAPA DE PRODUCCIÓN (RUNNER)
 # ==========================================
-FROM node:18-alpine
+FROM node:20-alpine
 
 WORKDIR /usr/src/app
 
@@ -28,17 +28,13 @@ WORKDIR /usr/src/app
 COPY package*.json ./
 
 # Instalamos SOLO dependencias de producción
-RUN npm install --only=production
+RUN npm install --omit=dev
 
 # Traemos SOLO el código compilado de este microservicio
-COPY --from=builder /usr/src/app/dist/apps/problem-catalog-service ./dist
-
-# Variables de entorno
-ENV NODE_ENV=production
-ENV CATALOG_PORT=3002
+COPY --from=builder /usr/src/app/dist/apps/iam-service ./dist
 
 # Exponemos el puerto
-EXPOSE 3002
+EXPOSE 3001
 
 # Ejecutamos el servicio
 CMD ["node", "dist/main.js"]
