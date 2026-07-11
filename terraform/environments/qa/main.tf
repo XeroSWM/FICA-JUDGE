@@ -13,7 +13,35 @@ data "aws_ami" "ubuntu" {
 }
 
 # =================================================================
-# 1. DESPLIEGUE DEL IAM SERVICE (Con PostgreSQL)
+# 1. API GATEWAY (Enrutador Principal)
+# =================================================================
+module "api_gateway" {
+  source = "../../modules/microservice"
+
+  service_name  = "api-gateway"
+  environment   = "qa"
+  vpc_id        = aws_vpc.fica_vpc.id
+  subnet_ids    = [aws_subnet.fica_subnet_a.id, aws_subnet.fica_subnet_b.id]
+  app_sg_id     = aws_security_group.fica_sg.id
+  ami_id        = data.aws_ami.ubuntu.id
+  instance_type = var.instance_type
+
+  app_port      = 3000
+  docker_image  = "xxavyx38/api-gateway:latest"
+  
+  # El Gateway solo enruta, no necesita BD propia
+  requires_rds      = false
+  requires_mongo    = false
+  requires_redis    = false
+  requires_rabbitmq = false
+  
+  db_name       = var.db_name
+  db_username   = var.db_username
+  db_password   = var.db_password
+}
+
+# =================================================================
+# 2. IAM SERVICE (Autenticación y Perfiles)
 # =================================================================
 module "iam_service" {
   source = "../../modules/microservice"
@@ -26,22 +54,22 @@ module "iam_service" {
   ami_id        = data.aws_ami.ubuntu.id
   instance_type = var.instance_type
 
-  # Configuración específica de la App
   app_port      = 3001
-  docker_image  = "xxavyx38/fica-iam-service:latest"
+  docker_image  = "xxavyx38/iam-service:latest"
   
-  # Interruptores de Base de Datos
-  requires_rds   = true
-  requires_mongo = false
+  # Requiere Postgres (Usuarios) y Redis (Sesiones JWT)
+  requires_rds      = true
+  requires_mongo    = false
+  requires_redis    = true
+  requires_rabbitmq = false
   
-  # Credenciales RDS
   db_name       = var.db_name
   db_username   = var.db_username
   db_password   = var.db_password
 }
 
 # =================================================================
-# 2. DESPLIEGUE DEL PROBLEM CATALOG SERVICE (Con DocumentDB/Mongo)
+# 3. PROBLEM CATALOG SERVICE (Gestión de Problemas)
 # =================================================================
 module "catalog_service" {
   source = "../../modules/microservice"
@@ -54,16 +82,100 @@ module "catalog_service" {
   ami_id        = data.aws_ami.ubuntu.id
   instance_type = var.instance_type
 
-  # Configuración específica de la App
   app_port      = 3002
   docker_image  = "xxavyx38/problem-catalog-service:latest"
   
-  # Interruptores de Base de Datos (Apagamos RDS, Encendemos Mongo)
-  requires_rds   = false
-  requires_mongo = true
+  # Requiere Mongo (JSONs de problemas y casos de prueba)
+  requires_rds      = false
+  requires_mongo    = true
+  requires_redis    = false
+  requires_rabbitmq = false
   
-  # Credenciales DocumentDB (No usa db_name)
   db_name       = "ficacatalog_qa"
+  db_username   = var.db_username
+  db_password   = var.db_password
+}
+
+# =================================================================
+# 4. RANKING SERVICE (Tablas de Posiciones)
+# =================================================================
+module "ranking_service" {
+  source = "../../modules/microservice"
+
+  service_name  = "ranking"
+  environment   = "qa"
+  vpc_id        = aws_vpc.fica_vpc.id
+  subnet_ids    = [aws_subnet.fica_subnet_a.id, aws_subnet.fica_subnet_b.id]
+  app_sg_id     = aws_security_group.fica_sg.id
+  ami_id        = data.aws_ami.ubuntu.id
+  instance_type = var.instance_type
+
+  app_port      = 3004
+  docker_image  = "xxavyx38/ranking-service:latest"
+  
+  # Requiere Postgres (Historial) y Redis (Leaderboard en tiempo real)
+  requires_rds      = true
+  requires_mongo    = false
+  requires_redis    = true
+  requires_rabbitmq = false
+  
+  db_name       = var.db_name
+  db_username   = var.db_username
+  db_password   = var.db_password
+}
+
+# =================================================================
+# 5. SUBMISSION SERVICE (Motor de Envíos al Sandbox)
+# =================================================================
+module "submission_service" {
+  source = "../../modules/microservice"
+
+  service_name  = "submission"
+  environment   = "qa"
+  vpc_id        = aws_vpc.fica_vpc.id
+  subnet_ids    = [aws_subnet.fica_subnet_a.id, aws_subnet.fica_subnet_b.id]
+  app_sg_id     = aws_security_group.fica_sg.id
+  ami_id        = data.aws_ami.ubuntu.id
+  instance_type = var.instance_type
+
+  app_port      = 3003
+  docker_image  = "xxavyx38/submission-service:latest"
+  
+  # Requiere Postgres (Historial de envíos) y RabbitMQ (Cola para Docker)
+  requires_rds      = true
+  requires_mongo    = false
+  requires_redis    = false
+  requires_rabbitmq = true
+  
+  db_name       = var.db_name
+  db_username   = var.db_username
+  db_password   = var.db_password
+}
+
+# =================================================================
+# 6. ASSIGNMENT SERVICE (Deberes y Exámenes)
+# =================================================================
+module "assignment_service" {
+  source = "../../modules/microservice"
+
+  service_name  = "assignment"
+  environment   = "qa"
+  vpc_id        = aws_vpc.fica_vpc.id
+  subnet_ids    = [aws_subnet.fica_subnet_a.id, aws_subnet.fica_subnet_b.id]
+  app_sg_id     = aws_security_group.fica_sg.id
+  ami_id        = data.aws_ami.ubuntu.id
+  instance_type = var.instance_type
+
+  app_port      = 3005
+  docker_image  = "xxavyx38/assignment-service:latest"
+  
+  # Requiere Postgres (Gestión de fechas, notas y reglas del examen)
+  requires_rds      = true
+  requires_mongo    = false
+  requires_redis    = false
+  requires_rabbitmq = false
+  
+  db_name       = var.db_name
   db_username   = var.db_username
   db_password   = var.db_password
 }
@@ -71,12 +183,32 @@ module "catalog_service" {
 # =================================================================
 # URLS DE SALIDA DE LOS BALANCEADORES DE CARGA (ALB)
 # =================================================================
+output "api_gateway_url" {
+  description = "URL principal de entrada (API Gateway)"
+  value       = module.api_gateway.service_url
+}
+
 output "iam_api_url" {
-  description = "URL pública balanceada del servicio de Autenticación (IAM)"
+  description = "URL del servicio de Autenticación (IAM)"
   value       = module.iam_service.service_url
 }
 
 output "catalog_api_url" {
-  description = "URL pública balanceada del Catálogo de Problemas"
+  description = "URL del Catálogo de Problemas"
   value       = module.catalog_service.service_url
+}
+
+output "ranking_api_url" {
+  description = "URL del Servicio de Rankings"
+  value       = module.ranking_service.service_url
+}
+
+output "submission_api_url" {
+  description = "URL del Servicio de Entregas (Submissions)"
+  value       = module.submission_service.service_url
+}
+
+output "assignment_api_url" {
+  description = "URL del Servicio de Evaluaciones (Assignments)"
+  value       = module.assignment_service.service_url
 }

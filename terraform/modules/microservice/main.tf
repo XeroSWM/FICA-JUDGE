@@ -46,21 +46,17 @@ resource "aws_launch_template" "lt" {
               systemctl start docker
               systemctl enable docker
               
-              export MONGO_URI=""
-              
-              # Si requiere Mongo, levantamos un contenedor local en la EC2
-              if [ "${var.requires_mongo}" == "true" ]; then
-                docker run -d -p 27017:27017 --name fica-mongo-db --restart unless-stopped mongo:latest
-                export MONGO_URI="mongodb://localhost:27017/${var.db_name}?authSource=admin"
-              fi
-              
+              # Correr el contenedor mapeando todas las conexiones nativas de AWS
               docker run -d -p ${var.app_port}:${var.app_port} --name fica-${var.service_name}-service --restart unless-stopped \
                 -e DB_HOST="${try(aws_db_instance.microservice_db[0].address, "")}" \
                 -e DB_PORT=5432 \
                 -e DB_USERNAME="${var.db_username}" \
                 -e DB_PASSWORD="${var.db_password}" \
                 -e DB_NAME="${var.db_name}" \
-                -e MONGO_URI="$MONGO_URI" \
+                -e MONGO_URI="${try("mongodb://${var.db_username}:${var.db_password}@${aws_docdb_cluster.mongo[0].endpoint}:27017/${var.db_name}?replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false", "")}" \
+                -e REDIS_HOST="${try(aws_elasticache_cluster.redis[0].cache_nodes[0].address, "")}" \
+                -e REDIS_PORT=6379 \
+                -e RABBITMQ_URL="${try(aws_mq_broker.rabbitmq[0].instances[0].endpoints[0], "")}" \
                 -e PORT=${var.app_port} \
                 ${var.docker_image}
               EOF

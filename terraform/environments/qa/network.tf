@@ -65,6 +65,7 @@ resource "aws_security_group" "fica_sg" {
   description = "Permitir trafico HA para FICA-JUDGE"
   vpc_id      = aws_vpc.fica_vpc.id
 
+  # Tráfico HTTP desde Internet hacia los Balanceadores de Carga
   ingress {
     description = "HTTP Balanceador"
     from_port   = 80
@@ -73,22 +74,16 @@ resource "aws_security_group" "fica_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  # Abrimos el rango completo para todos los Microservicios (3000 a 3005)
   ingress {
-    description = "IAM Service API"
-    from_port   = 3001
-    to_port     = 3001
+    description = "Puertos de la Flota de Microservicios Node.js"
+    from_port   = 3000
+    to_port     = 3005
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  ingress {
-    description = "Problem Catalog Service API"
-    from_port   = 3002
-    to_port     = 3002
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
+  # Acceso Administrativo (Opcional, se recomienda restringir a tu IP real en Producción)
   ingress {
     description = "SSH"
     from_port   = 22
@@ -97,6 +92,7 @@ resource "aws_security_group" "fica_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  # Salida libre a Internet (Para que Docker pueda descargar las imágenes)
   egress {
     from_port   = 0
     to_port     = 0
