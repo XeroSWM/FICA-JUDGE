@@ -1,22 +1,33 @@
-name: Entrega Continua Problem Catalog (Docker Hub)
+name: Entrega Continua Monorepo (Docker Hub)
 
 on:
   push:
     branches:
       - qa
-    paths:
-      # Opcional: Esto hace que el pipeline solo se ejecute si detecta cambios 
-      # dentro de la carpeta del catálogo, ahorrando minutos de GitHub Actions.
-      - 'fica-judge/apps/problem-catalog-service/**'
+    # Eliminamos el bloque 'paths' restrictivo. 
+    # Ahora el pipeline evaluará todo el ecosistema al hacer push a QA.
 
 jobs:
-  # FASE 1: Integración Continua
+  # FASE 1: Integración Continua (Matriz Paralela)
   build-and-test:
-    name: Validar Código (CI)
+    name: Validar Código (CI) - ${{ matrix.service }}
     runs-on: ubuntu-latest
+    
+    # 👇 LA MAGIA: Definimos la lista exacta de tus carpetas backend
+    strategy:
+      matrix:
+        service: 
+          - api-gateway
+          - assignment-service
+          - iam-service
+          - problem-catalog-service
+          - ranking-service
+          - submission-service
+
     defaults:
       run:
-        working-directory: ./fica-judge # <-- Entra a la raíz de tu monorepo
+        working-directory: ./fica-judge
+        
     steps:
       - uses: actions/checkout@v4
       
@@ -25,14 +36,27 @@ jobs:
           node-version: '20'
           
       - run: npm install
-      # <-- Validamos específicamente que el catálogo compile sin errores
-      - run: npm run build problem-catalog-service 
+      
+      # Compila dinámicamente el servicio que esté iterando la matriz en este momento
+      - run: npm run build ${{ matrix.service }} 
 
   # FASE 2: Publicar en Docker Hub
   docker-publish:
-    name: Construir y Subir a Docker Hub
-    needs: build-and-test # <-- Garantiza que solo se suba si la fase 1 fue exitosa
+    name: Construir y Subir - ${{ matrix.service }}
+    needs: build-and-test 
     runs-on: ubuntu-latest
+    
+    # 👇 Replicamos la misma matriz para crear una imagen Docker por cada servicio
+    strategy:
+      matrix:
+        service: 
+          - api-gateway
+          - assignment-service
+          - iam-service
+          - problem-catalog-service
+          - ranking-service
+          - submission-service
+
     steps:
       - uses: actions/checkout@v4
 
@@ -42,13 +66,13 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Construir y Empujar Problem Catalog
+      - name: Construir y Empujar Imagen
         uses: docker/build-push-action@v5
         with:
-          context: ./fica-judge # <-- El contexto sigue siendo la raíz del monorepo
-          # <-- Ruta exacta hacia el Dockerfile del catálogo
-          file: ./fica-judge/apps/problem-catalog-service/Dockerfile 
+          context: ./fica-judge 
+          # Apunta al Dockerfile exacto de la iteración actual
+          file: ./fica-judge/apps/${{ matrix.service }}/Dockerfile 
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/problem-catalog-service:latest
-            ${{ secrets.DOCKER_USERNAME }}/problem-catalog-service:v1
+            ${{ secrets.DOCKER_USERNAME }}/${{ matrix.service }}:latest
+            ${{ secrets.DOCKER_USERNAME }}/${{ matrix.service }}:qa-${{ github.sha }}
