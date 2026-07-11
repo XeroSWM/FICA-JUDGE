@@ -41,22 +41,45 @@ const AssignmentDetail: React.FC = () => {
     setOutput('Enviando código al servidor de FICA-JUDGE...\n');
 
     const token = localStorage.getItem('fj_token');
-    const studentEmail = localStorage.getItem('userEmail') || 'estudiante@uce.edu.ec'; 
+    
+    // 👇 1. DECODIFICACIÓN DEL TOKEN PARA OBTENER EL USUARIO REAL
+    let realStudentId = 'estudiante@uce.edu.ec'; 
+    if (token) {
+      try {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+        const decoded = JSON.parse(jsonPayload);
+        realStudentId = decoded.email || decoded.sub || decoded.id || 'estudiante@uce.edu.ec';
+      } catch (e) {
+        console.error("Error leyendo token");
+      }
+    }
+
     const currentProblem = assignment.problemsData[currentProblemIndex];
 
     try {
-      // 1. Enviar al Sandbox
+      // 👇 2. ENVIAR AL SANDBOX (Con el problemId y el realStudentId corregidos)
       await axios.post(
         `${import.meta.env.VITE_API_URL}/submissions`, 
-        { sourceCode, language: 'python', problemId: currentProblem.id, studentId: studentEmail },
+        { 
+          sourceCode, 
+          language: 'python', 
+          problemId: currentProblem._id || currentProblem.id, 
+          studentId: realStudentId 
+        },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
       setOutput(prev => prev + 'Evaluando casos de prueba en clúster Docker...\n');
       
-      // Simulación de respuesta del Sandbox (Cambiar a tu lógica real)
+      // Simulación de respuesta del Sandbox
       await new Promise(resolve => setTimeout(resolve, 2000)); 
-      const isSuccess = false; 
+      
+      // 👇 3. SIMULAMOS EL ÉXITO PARA VER EL CÁLCULO DE LA NOTA FINAL
+      const isSuccess = true; 
 
       if (isSuccess) {
         setOutput(prev => prev + '\n[VEREDICTO]: ✅ ACCEPTED\nTodos los casos de prueba pasaron correctamente.\n');
@@ -64,10 +87,15 @@ const AssignmentDetail: React.FC = () => {
         setOutput(prev => prev + '\n[VEREDICTO]: ❌ WRONG_ANSWER\nFalló en casos de prueba ocultos. Revisa tu lógica.\n');
       }
 
-      // 2. Registrar Intento y Nota
+      // 4. REGISTRAR INTENTO Y NOTA
       const attemptRes = await axios.post(
         `${import.meta.env.VITE_API_URL}/assignments/attempt`,
-        { studentId: studentEmail, assignmentId: assignment.id, problemId: currentProblem.id, isSuccess },
+        { 
+          studentId: realStudentId, 
+          assignmentId: assignment.id, 
+          problemId: currentProblem._id || currentProblem.id, 
+          isSuccess 
+        },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
