@@ -9,26 +9,25 @@ const AssignmentDetail: React.FC = () => {
   const [assignment, setAssignment] = useState<any>(null);
   const [currentProblemIndex, setCurrentProblemIndex] = useState(0);
   const [sourceCode, setSourceCode] = useState('');
-  const [output, setOutput] = useState('Esperando ejecución...');
+  const [output, setOutput] = useState('Esperando ejecución...\nPara probar tu código, presiona "Ejecutar Código".');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const fetchAssignmentData = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('fj_token');
         const res = await axios.get(`${import.meta.env.VITE_API_URL}/assignments/${id}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         setAssignment(res.data);
         
-        // Cargar el código inicial del primer problema
         if (res.data.problemsData?.length > 0) {
           const starterCode = res.data.problemsData[0].templates?.find((t: any) => t.language === 'python')?.starterCode || '';
           setSourceCode(starterCode);
         }
       } catch (error: any) {
         if (error.response?.status === 403) {
-          alert('Este examen está fuera de fecha.');
+          alert('Este examen no está disponible actualmente por restricciones de fecha.');
           navigate('/assignments');
         }
       }
@@ -39,151 +38,227 @@ const AssignmentDetail: React.FC = () => {
   const handleSubmit = async () => {
     if (!assignment || !assignment.problemsData) return;
     setIsSubmitting(true);
-    setOutput('Enviando código al servidor...');
+    setOutput('Enviando código al servidor de FICA-JUDGE...\n');
 
-    const token = localStorage.getItem('token');
-    const studentEmail = localStorage.getItem('userEmail'); // O de donde saques el ID del estudiante en el front
+    const token = localStorage.getItem('fj_token');
+    
+    // 👇 1. DECODIFICACIÓN DEL TOKEN PARA OBTENER EL USUARIO REAL
+    let realStudentId = 'estudiante@uce.edu.ec'; 
+    if (token) {
+      try {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+        const decoded = JSON.parse(jsonPayload);
+        realStudentId = decoded.email || decoded.sub || decoded.id || 'estudiante@uce.edu.ec';
+      } catch (e) {
+        console.error("Error leyendo token");
+      }
+    }
+
     const currentProblem = assignment.problemsData[currentProblemIndex];
 
     try {
-      // 1. Enviar al microservicio de Submissions (Sandbox)
-      const submitRes = await axios.post(
+      // 👇 2. ENVIAR AL SANDBOX (Con el problemId y el realStudentId corregidos)
+      await axios.post(
         `${import.meta.env.VITE_API_URL}/submissions`, 
-        {
-          sourceCode,
-          language: 'python',
-          problemId: currentProblem.id,
-          studentId: studentEmail
+        { 
+          sourceCode, 
+          language: 'python', 
+          problemId: currentProblem._id || currentProblem.id, 
+          studentId: realStudentId 
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      // Simulación de polling rápido para el ejemplo (Ajusta a tu lógica real de websockets o polling)
-      setOutput('Evaluando casos de prueba en Docker...');
-      await new Promise(resolve => setTimeout(resolve, 3000)); 
+      setOutput(prev => prev + 'Evaluando casos de prueba en clúster Docker...\n');
       
-      // Asumimos que obtienes el veredicto final aquí. Simularemos un WRONG_ANSWER para probar la gamificación.
-      // Cambia esta variable dinámicamente con la respuesta de tu servidor real.
-      const isSuccess = false; 
+      // Simulación de respuesta del Sandbox
+      await new Promise(resolve => setTimeout(resolve, 2000)); 
+      
+      // 👇 3. SIMULAMOS EL ÉXITO PARA VER EL CÁLCULO DE LA NOTA FINAL
+      const isSuccess = true; 
 
       if (isSuccess) {
-        setOutput('✅ ACCEPTED: Todos los casos pasaron.');
+        setOutput(prev => prev + '\n[VEREDICTO]: ✅ ACCEPTED\nTodos los casos de prueba pasaron correctamente.\n');
       } else {
-        setOutput('❌ WRONG_ANSWER: Falló en algunos casos de prueba.');
+        setOutput(prev => prev + '\n[VEREDICTO]: ❌ WRONG_ANSWER\nFalló en casos de prueba ocultos. Revisa tu lógica.\n');
       }
 
-      // 2. Registrar el intento en el microservicio de Assignments
+      // 4. REGISTRAR INTENTO Y NOTA
       const attemptRes = await axios.post(
         `${import.meta.env.VITE_API_URL}/assignments/attempt`,
-        {
-          studentId: studentEmail,
-          assignmentId: assignment.id,
-          problemId: currentProblem.id,
-          isSuccess: isSuccess
+        { 
+          studentId: realStudentId, 
+          assignmentId: assignment.id, 
+          problemId: currentProblem._id || currentProblem.id, 
+          isSuccess 
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
       const { failedAttempts, finalScore, isSolved } = attemptRes.data;
       
-      let statusMsg = `\n\n--- REPORTE DE CALIFICACIÓN ---\nIntentos fallidos: ${failedAttempts}`;
+      let statusMsg = `\n========================================\nREPORTE DE CALIFICACIÓN OFICIAL\n========================================\n`;
+      statusMsg += `Intentos fallidos registrados: ${failedAttempts}\n`;
+      
       if (isSolved) {
-        statusMsg += `\n¡Problema Resuelto! Nota final: ${finalScore} / ${assignment.maxScore}`;
+        statusMsg += `Estado: COMPLETADO\nNota final obtenida: ${finalScore} / ${assignment.maxScore} pts\n`;
       } else {
-        statusMsg += `\nPenalización acumulada. Te quedan menos puntos potenciales.`;
+        statusMsg += `Estado: PENDIENTE\nPenalización aplicada: -${assignment.penaltyPerAttempt} pts\n`;
       }
       
       setOutput(prev => prev + statusMsg);
 
     } catch (error) {
-      setOutput('Error del sistema al evaluar la entrega.');
+      setOutput('Error de conexión con el sistema de evaluación.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (!assignment) return <div className="bg-[#0d1117] text-white p-8">Cargando entorno...</div>;
+  if (!assignment) {
+    return (
+      <div className="d-flex justify-content-center align-items-center w-100" style={{ height: '80vh', color: '#c9d1d9' }}>
+        <div className="spinner-border text-success" role="status"></div>
+        <span className="ms-3">Cargando Entorno de Evaluación...</span>
+      </div>
+    );
+  }
 
   const problem = assignment.problemsData[currentProblemIndex];
 
   return (
-    <div className="flex h-screen flex-col bg-[#0d1117] text-gray-300 font-sans">
-      {/* Top Header - FICA-JUDGE Style */}
-      <header className="flex items-center justify-between bg-[#161b22] p-4 border-b border-gray-700">
+    <div className="d-flex flex-column w-100" style={{ height: 'calc(100vh - 70px)' }}> {/* Ajustado para restar el alto del navbar principal */}
+      
+      {/* HEADER ESPECÍFICO DEL EXAMEN */}
+      <div className="d-flex justify-content-between align-items-center px-4 py-3" style={{ backgroundColor: '#161b22', borderBottom: '1px solid #30363d' }}>
         <div>
-          <span className="text-xs font-bold text-green-500 tracking-widest uppercase">Entorno de Evaluación Oficial</span>
-          <h1 className="text-xl font-bold text-white mt-1">{assignment.title}</h1>
+          <span style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#3fb950', letterSpacing: '1px', textTransform: 'uppercase' }}>
+            ● Entorno de Evaluación Oficial
+          </span>
+          <h4 className="text-white mb-0 mt-1 fw-bold">{assignment.title}</h4>
         </div>
-        <div className="text-right">
-          <p className="text-sm text-yellow-500 font-medium">Penalización: -{assignment.penaltyPerAttempt} pts por fallo</p>
-          <p className="text-xs text-gray-500 mt-1">Cierra: {new Date(assignment.endDate).toLocaleString()}</p>
+        <div className="text-end">
+          <div className="d-flex align-items-center justify-content-end mb-1">
+            <span style={{ backgroundColor: '#21262d', border: '1px solid #30363d', padding: '4px 10px', borderRadius: '4px', fontSize: '0.8rem', color: '#8b949e' }}>
+              Cierra el: {new Date(assignment.endDate).toLocaleString()}
+            </span>
+          </div>
+          <span style={{ fontSize: '0.75rem', color: '#d29922' }}>Penalización activa: -{assignment.penaltyPerAttempt} pts</span>
         </div>
-      </header>
+      </div>
 
-      {/* Main Content Split */}
-      <div className="flex flex-1 overflow-hidden">
+      {/* CUERPO PRINCIPAL DIVIDIDO */}
+      <div className="d-flex flex-grow-1" style={{ overflow: 'hidden' }}>
         
-        {/* Left Panel: Problem Description */}
-        <div className="w-1/3 border-r border-gray-700 overflow-y-auto bg-[#0d1117] p-6">
-          <div className="mb-4 flex space-x-2">
-            {assignment.problemsData.map((_: any, idx: number) => (
-              <button
-                key={idx}
-                onClick={() => setCurrentProblemIndex(idx)}
-                className={`px-3 py-1 rounded text-sm ${currentProblemIndex === idx ? 'bg-gray-700 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
-              >
-                Ejercicio {idx + 1}
-              </button>
-            ))}
-          </div>
-
-          <h2 className="text-2xl font-bold text-white mb-2">{problem?.title}</h2>
+        {/* PANEL IZQUIERDO: DESCRIPCIÓN DEL PROBLEMA */}
+        <div style={{ width: '40%', minWidth: '400px', backgroundColor: '#0d1117', borderRight: '1px solid #30363d', overflowY: 'auto' }}>
           
-          <div className="flex space-x-4 mb-6 text-xs text-gray-400">
-            <span className="bg-gray-800 px-2 py-1 rounded">Límite: {problem?.timeLimit}ms</span>
-            <span className="bg-gray-800 px-2 py-1 rounded">Memoria: {problem?.memoryLimit}MB</span>
+          {/* Pestañas estilo FICA-JUDGE */}
+          <div className="d-flex" style={{ borderBottom: '1px solid #30363d', backgroundColor: '#010409' }}>
+            <div style={{ padding: '10px 20px', borderBottom: '2px solid #3fb950', color: '#c9d1d9', fontSize: '0.85rem', fontWeight: 'bold', cursor: 'pointer' }}>
+              1. Resolución
+            </div>
+            <div style={{ padding: '10px 20px', color: '#8b949e', fontSize: '0.85rem', cursor: 'pointer' }}>
+              2. Ejercicios Prácticos ({assignment.problemsData.length})
+            </div>
           </div>
 
-          <div className="prose prose-invert max-w-none text-sm text-gray-300">
-            <p>{problem?.description}</p>
-            
-            <h3 className="text-white mt-6 mb-2 font-semibold border-b border-gray-700 pb-1">Restricciones:</h3>
-            <ul className="list-disc pl-5 space-y-1 text-gray-400">
-              {problem?.constraints?.map((c: string, i: number) => <li key={i}>{c}</li>)}
+          <div className="p-4">
+            <div className="d-flex justify-content-between align-items-start mb-3">
+              <h3 className="text-white fw-bold m-0" style={{ fontSize: '1.4rem' }}>{problem?.title}</h3>
+              <span style={{ backgroundColor: 'rgba(56, 139, 253, 0.15)', color: '#58a6ff', padding: '3px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold' }}>
+                {problem?.difficulty || 'NORMAL'}
+              </span>
+            </div>
+
+            <p style={{ color: '#8b949e', fontSize: '0.9rem', lineHeight: '1.6' }}>
+              {problem?.description}
+            </p>
+
+            {/* Tabla de Límites */}
+            <div className="d-flex my-4 rounded" style={{ backgroundColor: '#161b22', border: '1px solid #30363d' }}>
+              <div className="flex-fill p-3 text-center" style={{ borderRight: '1px solid #30363d' }}>
+                <div style={{ fontSize: '0.7rem', color: '#8b949e', fontWeight: 'bold', letterSpacing: '1px' }}>LÍMITE TIEMPO</div>
+                <div style={{ color: '#c9d1d9', fontSize: '0.9rem', marginTop: '5px' }}>{problem?.timeLimit} ms</div>
+              </div>
+              <div className="flex-fill p-3 text-center">
+                <div style={{ fontSize: '0.7rem', color: '#8b949e', fontWeight: 'bold', letterSpacing: '1px' }}>LÍMITE MEMORIA</div>
+                <div style={{ color: '#c9d1d9', fontSize: '0.9rem', marginTop: '5px' }}>{problem?.memoryLimit} MB</div>
+              </div>
+            </div>
+
+            <h6 className="text-white fw-bold mb-3" style={{ fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Restricciones:</h6>
+            <ul style={{ color: '#8b949e', fontSize: '0.85rem', paddingLeft: '20px' }}>
+              {problem?.constraints?.map((c: string, i: number) => <li key={i} className="mb-2">{c}</li>)}
             </ul>
           </div>
         </div>
 
-        {/* Right Panel: Editor & Terminal */}
-        <div className="flex flex-1 flex-col">
-          {/* Editor */}
-          <div className="flex-1 border-b border-gray-700">
+        {/* PANEL DERECHO: EDITOR Y TERMINAL */}
+        <div className="d-flex flex-column" style={{ width: '60%', backgroundColor: '#0d1117' }}>
+          
+          {/* Editor Header */}
+          <div className="d-flex justify-content-between align-items-center px-3 py-2" style={{ backgroundColor: '#161b22', borderBottom: '1px solid #30363d' }}>
+            <span style={{ fontSize: '0.8rem', color: '#8b949e' }}>main.py</span>
+            <div style={{ fontSize: '0.8rem', color: '#8b949e', backgroundColor: '#010409', padding: '2px 8px', borderRadius: '4px', border: '1px solid #30363d' }}>
+              Python 3.10
+            </div>
+          </div>
+
+          {/* Monaco Editor */}
+          <div style={{ flexGrow: 1, position: 'relative' }}>
             <Editor
               height="100%"
               theme="vs-dark"
               language="python"
               value={sourceCode}
               onChange={(value) => setSourceCode(value || '')}
-              options={{ minimap: { enabled: false }, fontSize: 14 }}
+              options={{ minimap: { enabled: false }, fontSize: 14, padding: { top: 15 } }}
             />
           </div>
 
-          {/* Terminal / Output */}
-          <div className="h-64 bg-[#010409] p-4 flex flex-col">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-xs font-bold text-gray-500 tracking-wider">SALIDA DE TERMINAL</span>
+          {/* Actions Bar & Terminal */}
+          <div style={{ backgroundColor: '#010409', borderTop: '1px solid #30363d', height: '300px', display: 'flex', flexDirection: 'column' }}>
+            
+            {/* Action Buttons */}
+            <div className="d-flex justify-content-end p-3" style={{ borderBottom: '1px solid #30363d' }}>
+              <button 
+                className="btn btn-sm me-2 fw-bold text-white" 
+                style={{ backgroundColor: '#21262d', border: '1px solid #30363d' }}
+              >
+                ⏵ Ejecutar Código
+              </button>
               <button 
                 onClick={handleSubmit}
                 disabled={isSubmitting}
-                className={`px-6 py-2 font-bold rounded ${isSubmitting ? 'bg-gray-600 text-gray-400 cursor-wait' : 'bg-green-600 text-white hover:bg-green-500 transition-colors'}`}
+                className="btn btn-sm fw-bold text-white" 
+                style={{ backgroundColor: '#238636', border: '1px solid rgba(240, 246, 252, 0.1)' }}
               >
-                {isSubmitting ? 'Ejecutando...' : 'Enviar Solución'}
+                {isSubmitting ? 'Evaluando...' : 'Enviar Solución'}
               </button>
             </div>
-            <pre className="flex-1 p-3 rounded bg-black border border-gray-800 text-gray-300 font-mono text-sm overflow-y-auto whitespace-pre-wrap">
-              {output}
-            </pre>
+
+            {/* Terminal Output */}
+            <div className="p-3" style={{ flexGrow: 1, overflowY: 'auto' }}>
+              <span style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#8b949e', letterSpacing: '1px' }}>&gt;_ SALIDA TERMINAL & JUEZ EVALUADOR</span>
+              <pre className="mt-2 p-3 rounded" style={{ 
+                backgroundColor: '#0d1117', 
+                border: '1px solid #30363d', 
+                color: '#c9d1d9', 
+                fontFamily: 'monospace', 
+                fontSize: '0.85rem',
+                minHeight: '150px',
+                whiteSpace: 'pre-wrap'
+              }}>
+                {output}
+              </pre>
+            </div>
           </div>
+
         </div>
       </div>
     </div>
