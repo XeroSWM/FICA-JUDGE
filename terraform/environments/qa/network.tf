@@ -82,6 +82,15 @@ resource "aws_security_group" "fica_sg" {
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
+  
+  # 🟢 NUEVA REGLA: Permitir conexión a RabbitMQ desde otros microservicios/pods
+  ingress {
+    description = "RabbitMQ y Panel de Administracion"
+    from_port   = 5672
+    to_port     = 15672
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 
   # Acceso Administrativo (Opcional, se recomienda restringir a tu IP real en Producción)
   ingress {
