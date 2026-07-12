@@ -15,7 +15,6 @@ RUN npm run build api-gateway
 # 2. ETAPA DE PRODUCCIÓN (RUNNER)
 # ==========================================
 FROM node:18-alpine
-
 WORKDIR /usr/src/app
 
 COPY package*.json ./

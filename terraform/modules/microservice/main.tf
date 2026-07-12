@@ -1,4 +1,6 @@
+# =================================================================
 # 1. Balanceador de Carga
+# =================================================================
 resource "aws_lb" "alb" {
   name               = "fica-${var.service_name}-alb-${var.environment}"
   internal           = false
@@ -32,7 +34,9 @@ resource "aws_lb_listener" "listener" {
   }
 }
 
+# =================================================================
 # 2. Plantilla de Instancia y Docker
+# =================================================================
 resource "aws_launch_template" "lt" {
   name_prefix   = "fica-${var.service_name}-node-"
   image_id      = var.ami_id
@@ -78,12 +82,14 @@ resource "aws_launch_template" "lt" {
   )
 }
 
+# =================================================================
 # 3. Grupo de Autoescalado
+# =================================================================
 resource "aws_autoscaling_group" "asg" {
   name                = "fica-${var.service_name}-asg-${var.environment}"
-  desired_capacity    = 2
-  max_size            = 2
-  min_size            = 2
+  desired_capacity    = 1
+  max_size            = 1
+  min_size            = 1
   vpc_zone_identifier = var.subnet_ids
   target_group_arns   = [aws_lb_target_group.tg.arn]
 
