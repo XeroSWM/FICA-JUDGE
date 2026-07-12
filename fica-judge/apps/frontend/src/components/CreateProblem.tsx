@@ -69,7 +69,7 @@ const CreateProblem: React.FC = () => {
     };
 
     try {
-      const apiUrl = import.meta.env.VITE_CATALOG_API_URL || 'http://localhost:3002';
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
       await axios.post(`${apiUrl}/problems`, payload);
       navigate('/problems');
     } catch (err) {

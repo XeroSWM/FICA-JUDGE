@@ -50,33 +50,33 @@ resource "aws_launch_template" "lt" {
               systemctl start docker
               systemctl enable docker
               
-              export RABBITMQ_URL=""
-              export MONGO_URI=""
-              
               # Levantar RabbitMQ localmente si se requiere
               if [ "${var.requires_rabbitmq}" == "true" ]; then
                 docker run -d -p 5672:5672 -p 15672:15672 --name fica-rabbitmq --restart unless-stopped rabbitmq:3-management
-                export RABBITMQ_URL="amqp://guest:guest@172.17.0.1:5672"
               fi
 
               # Levantar MongoDB localmente si se requiere
               if [ "${var.requires_mongo}" == "true" ]; then
                 docker run -d -p 27017:27017 -e MONGO_INITDB_ROOT_USERNAME="${var.db_username}" -e MONGO_INITDB_ROOT_PASSWORD="${var.db_password}" --name fica-mongodb --restart unless-stopped mongo:latest
-                export MONGO_URI="mongodb://${var.db_username}:${var.db_password}@172.17.0.1:27017/${var.db_name}?authSource=admin"
               fi
               
-              # Correr el contenedor de Node mapeando las conexiones dinámicamente
+              # Correr el contenedor de Node mapeando las conexiones dinámicamente desde Terraform
               docker run -d -p ${var.app_port}:${var.app_port} --name fica-${var.service_name}-service --restart unless-stopped \
                 -e DB_HOST="${try(aws_db_instance.microservice_db[0].address, "")}" \
                 -e DB_PORT=5432 \
                 -e DB_USERNAME="${var.db_username}" \
                 -e DB_PASSWORD="${var.db_password}" \
                 -e DB_NAME="${var.db_name}" \
-                -e MONGO_URI="$MONGO_URI" \
+                -e MONGO_URI="${var.requires_mongo ? "mongodb://${var.db_username}:${var.db_password}@172.17.0.1:27017/${var.db_name}?authSource=admin" : ""}" \
                 -e REDIS_HOST="${try(aws_elasticache_cluster.redis[0].cache_nodes[0].address, "")}" \
                 -e REDIS_PORT=6379 \
-                -e RABBITMQ_URL="$RABBITMQ_URL" \
+                -e RABBITMQ_URL="${var.requires_rabbitmq ? "amqp://guest:guest@172.17.0.1:5672" : ""}" \
                 -e PORT=${var.app_port} \
+                -e IAM_SERVICE_URL="${var.iam_service_url}" \
+                -e CATALOG_SERVICE_URL="${var.catalog_service_url}" \
+                -e SUBMISSION_SERVICE_URL="${var.submission_service_url}" \
+                -e RANKING_SERVICE_URL="${var.ranking_service_url}" \
+                -e ASSIGNMENT_SERVICE_URL="${var.assignment_service_url}" \
                 ${var.docker_image}
               EOF
   )

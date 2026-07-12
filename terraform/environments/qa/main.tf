@@ -29,6 +29,13 @@ module "api_gateway" {
   app_port      = 3000
   docker_image  = "xxavyx38/api-gateway:latest"
   
+  # 👇 INYECCIÓN DINÁMICA DE RUTAS 👇
+  iam_service_url        = "http://${module.iam_service.service_url}/auth"
+  catalog_service_url    = "http://${module.catalog_service.service_url}/problems"
+  submission_service_url = "http://${module.submission_service.service_url}/submissions"
+  ranking_service_url    = "http://${module.ranking_service.service_url}/ranking"
+  assignment_service_url = "http://${module.assignment_service.service_url}/assignments"
+  
   # El Gateway solo enruta, no necesita BD propia
   requires_rds      = false
   requires_mongo    = false
@@ -143,7 +150,7 @@ module "submission_service" {
   
   # Requiere Postgres (Historial de envíos) y RabbitMQ (Cola para Docker)
   requires_rds      = true
-  requires_mongo    = false
+  requires_mongo    = true    # <--- AQUÍ ESTÁ EL CAMBIO PARA HABILITAR MONGODB
   requires_redis    = false
   requires_rabbitmq = true
   

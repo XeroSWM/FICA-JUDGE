@@ -10,24 +10,23 @@ import { ProblemController } from './infrastructure/controllers/problem.controll
 
 // 3. Aplicación (Handlers)
 import { CreateProblemHandler } from './application/commands/create-problem.handler';
-import { GetProblemsHandler } from './application/queries/get-problems.handler'; // <--- IMPORTA AQUÍ
+import { GetProblemsHandler } from './application/queries/get-problems.handler'; 
 
 // Agrupamos
 const CommandHandlers = [CreateProblemHandler];
-const QueryHandlers = [GetProblemsHandler]; // <--- NUEVO ARREGLO DE QUERIES
+const QueryHandlers = [GetProblemsHandler]; 
 
 @Module({
   imports: [
     CqrsModule,
     MongooseModule.forRootAsync({
       useFactory: () => {
-        const host = process.env.MONGO_HOST || 'localhost';
-        const port = process.env.MONGO_PORT || '27017';
-        const user = process.env.MONGO_USER || 'mongo_admin';
-        const pass = process.env.MONGO_PASSWORD || 'mongo_secret';
-        const db   = process.env.MONGO_DB || 'problem_db';
+        // 👇 CORRECCIÓN: Leemos la URI completa que inyecta Terraform
+        // Si no existe (desarrollo local), armamos la de localhost por defecto.
+        const uri = process.env.MONGO_URI || 'mongodb://mongo_admin:mongo_secret@localhost:27017/problem_db?authSource=admin';
+        
         return {
-          uri: `mongodb://${user}:${pass}@${host}:${port}/${db}?authSource=admin`,
+          uri,
         };
       },
     }),
@@ -36,7 +35,7 @@ const QueryHandlers = [GetProblemsHandler]; // <--- NUEVO ARREGLO DE QUERIES
   controllers: [ProblemController],
   providers: [
     ...CommandHandlers, 
-    ...QueryHandlers // <--- AGREGADO AQUÍ
+    ...QueryHandlers 
   ],
 })
 export class ProblemCatalogModule {}

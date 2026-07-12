@@ -1,3 +1,8 @@
+// 👇 1. INYECCIÓN GLOBAL DE CRYPTO (Solución al bug de Webpack + Mongo)
+import * as crypto from 'crypto';
+(global as any).crypto = crypto;
+
+// 👇 2. Tu código original intacto
 import { NestFactory } from '@nestjs/core';
 import { ProblemCatalogModule } from './problem-catalog.module';
 import { Logger, ValidationPipe } from '@nestjs/common';
