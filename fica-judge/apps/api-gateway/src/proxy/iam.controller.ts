@@ -5,8 +5,9 @@ import { firstValueFrom } from 'rxjs';
 
 @Controller('auth')
 export class IamController {
-  // URL interna de tu microservicio de Identidad y Accesos (IAM)
-  private readonly IAM_URL = 'http://localhost:3001/auth';
+  // 👇 AQUÍ SE RESUELVE EL BUG 👇
+  // Intenta leer de las variables de entorno, y si no existe (desarrollo local), usa localhost por defecto
+  private readonly IAM_URL = process.env.IAM_SERVICE_URL || 'http://localhost:3001/auth';
 
   constructor(private readonly httpService: HttpService) {}
 

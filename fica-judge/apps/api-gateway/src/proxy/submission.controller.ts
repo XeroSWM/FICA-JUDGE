@@ -6,7 +6,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('submissions')
 export class SubmissionController {
-  private readonly SUBMISSION_URL = 'http://localhost:3003/submissions';
+  private readonly SUBMISSION_URL = process.env.SUBMISSION_SERVICE_URL || 'http://localhost:3003/submissions';
 
   constructor(private readonly httpService: HttpService) {}
 
