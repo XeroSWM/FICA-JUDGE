@@ -97,23 +97,39 @@ export class SubmissionServiceService {
       let container: any;
       
       try {
-        // 👇 INYECCIÓN DE BOILERPLATE (WRAPPER)
+        // 👇 INYECCIÓN DE BOILERPLATE (WRAPPER INTELIGENTE)
         let finalCode = sourceCode;
 
         if (problemRecord && problemRecord.hiddenWrapper) {
           finalCode = `${sourceCode}\n\n${problemRecord.hiddenWrapper}`;
         } else if (lang === 'python' || lang === 'python3') {
-          // Wrapper ajustado para longest_thermal_runaway
-          const hiddenWrapper = `
+          // Si el código incluye la declaración estándar de 'def solution', inyectamos el wrapper dinámico
+          if (sourceCode.includes('def solution')) {
+            const hiddenWrapper = `
+import sys
+if __name__ == '__main__':
+    entrada = sys.stdin.read()
+    if entrada:
+        output_data = solution(entrada)
+        if output_data is not None:
+            print(output_data)
+`;
+            finalCode = `${sourceCode}\n${hiddenWrapper}`;
+          } else {
+            // Soporte fallback por si el código ya contiene una estructura 'Solution'
+            const legacyWrapper = `
 import sys
 if __name__ == '__main__':
     entrada = sys.stdin.read().split()
     if entrada:
         valores = [int(x) for x in entrada]
-        solucion = Solution()
-        print(solucion.longest_thermal_runaway(valores))
+        if 'Solution' in globals():
+            solucion = Solution()
+            if hasattr(solucion, 'longest_thermal_runaway'):
+                print(solucion.longest_thermal_runaway(valores))
 `;
-          finalCode = `${sourceCode}\n${hiddenWrapper}`;
+            finalCode = `${sourceCode}\n${legacyWrapper}`;
+          }
         }
 
         const base64Code = Buffer.from(finalCode).toString('base64');
@@ -230,21 +246,35 @@ if __name__ == '__main__':
     const lang = language || 'python';
     
     try {
-      // 👇 INYECCIÓN DE BOILERPLATE PARA EJECUCIÓN DIRECTA
+      // 👇 INYECCIÓN DE BOILERPLATE PARA EJECUCIÓN DIRECTA INTELIGENTE
       let finalCode = sourceCode;
 
       if (lang === 'python' || lang === 'python3') {
-        // Wrapper ajustado para longest_thermal_runaway
-        const hiddenWrapper = `
+        if (sourceCode.includes('def solution')) {
+          const hiddenWrapper = `
+import sys
+if __name__ == '__main__':
+    entrada = sys.stdin.read()
+    if entrada:
+        output_data = solution(entrada)
+        if output_data is not None:
+            print(output_data)
+`;
+          finalCode = `${sourceCode}\n${hiddenWrapper}`;
+        } else {
+          const legacyWrapper = `
 import sys
 if __name__ == '__main__':
     entrada = sys.stdin.read().split()
     if entrada:
         valores = [int(x) for x in entrada]
-        solucion = Solution()
-        print(solucion.longest_thermal_runaway(valores))
+        if 'Solution' in globals():
+            solucion = Solution()
+            if hasattr(solucion, 'longest_thermal_runaway'):
+                print(solucion.longest_thermal_runaway(valores))
 `;
-        finalCode = `${sourceCode}\n${hiddenWrapper}`;
+          finalCode = `${sourceCode}\n${legacyWrapper}`;
+        }
       }
 
       const base64Code = Buffer.from(finalCode).toString('base64');
