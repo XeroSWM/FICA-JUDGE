@@ -98,7 +98,8 @@ module "catalog_service" {
   requires_redis    = false
   requires_rabbitmq = false
   
-  db_name     = "ficacatalog_qa"
+  # 👇 EL CAMBIO: Unificamos la base de datos con var.db_name
+  db_name     = var.db_name
   db_username = var.db_username
   db_password = var.db_password
 }
@@ -150,7 +151,7 @@ module "submission_service" {
   
   # Requiere Postgres (Historial de envíos) y RabbitMQ (Cola para Docker)
   requires_rds      = true
-  requires_mongo    = true    # <--- AQUÍ ESTÁ EL CAMBIO PARA HABILITAR MONGODB
+  requires_mongo    = true
   requires_redis    = false
   requires_rabbitmq = true
   
