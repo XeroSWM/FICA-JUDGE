@@ -6,7 +6,8 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('ranking')
 export class RankingController {
-  private readonly RANKING_URL = 'http://localhost:3004/ranking';
+  // 👇 Dinámico: Busca la URL en AWS, si no existe, usa localhost para desarrollo
+  private readonly RANKING_URL = process.env.RANKING_SERVICE_URL || 'http://localhost:3004/ranking';
 
   constructor(private readonly httpService: HttpService) {}
 

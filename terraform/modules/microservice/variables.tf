@@ -12,6 +12,39 @@ variable "ami_id"        { type = string }
 variable "app_sg_id"     { type = string }
 
 # ==========================================
+# VARIABLES DINÁMICAS PARA EL API GATEWAY
+# ==========================================
+variable "iam_service_url" { 
+  type        = string
+  default     = "" 
+  description = "URL del balanceador del IAM Service"
+}
+
+variable "catalog_service_url" { 
+  type        = string
+  default     = "" 
+  description = "URL del balanceador del Catalog Service"
+}
+
+variable "submission_service_url" { 
+  type        = string
+  default     = "" 
+  description = "URL del balanceador del Submission Service"
+}
+
+variable "ranking_service_url" { 
+  type        = string
+  default     = "" 
+  description = "URL del balanceador del Ranking Service"
+}
+
+variable "assignment_service_url" { 
+  type        = string
+  default     = "" 
+  description = "URL del balanceador del Assignment Service"
+}
+
+# ==========================================
 # BANDERAS PARA CONTROL DE PERSISTENCIA Y BROKERS
 # ==========================================
 variable "requires_rds" { 

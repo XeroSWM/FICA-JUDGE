@@ -5,8 +5,8 @@ import { firstValueFrom } from 'rxjs';
 
 @Controller('problems')
 export class CatalogController {
-  // Definimos la URL interna de tu microservicio de catálogo
-  private readonly CATALOG_URL = 'http://localhost:3002/problems';
+  // 👇 Dinámico: Busca la URL en AWS, si no existe, usa localhost para desarrollo
+  private readonly CATALOG_URL = process.env.CATALOG_SERVICE_URL || 'http://localhost:3002/problems';
 
   constructor(private readonly httpService: HttpService) {}
 
