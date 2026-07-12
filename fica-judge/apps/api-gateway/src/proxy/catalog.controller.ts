@@ -29,4 +29,15 @@ export class CatalogController {
       return res.status(error.response?.status || 404).json(error.response?.data || { message: 'Problema no encontrado' });
     }
   }
+
+  // 👇 AQUÍ ESTÁ LA MAGIA: Habilitamos el paso para la creación (POST)
+  @Post()
+  async createProblem(@Body() body: any, @Res() res: Response) {
+    try {
+      const response = await firstValueFrom(this.httpService.post(this.CATALOG_URL, body));
+      return res.status(response.status).json(response.data);
+    } catch (error: any) {
+      return res.status(error.response?.status || 500).json(error.response?.data || { message: 'Error al crear problema en el catálogo' });
+    }
+  }
 }

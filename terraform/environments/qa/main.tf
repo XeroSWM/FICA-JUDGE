@@ -150,7 +150,7 @@ module "submission_service" {
   
   # Requiere Postgres (Historial de envíos) y RabbitMQ (Cola para Docker)
   requires_rds      = true
-  requires_mongo    = false
+  requires_mongo    = true    # <--- AQUÍ ESTÁ EL CAMBIO PARA HABILITAR MONGODB
   requires_redis    = false
   requires_rabbitmq = true
   

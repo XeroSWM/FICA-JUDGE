@@ -9,32 +9,35 @@ import { Problem, ProblemSchema } from './schemas/problem.schema';
 
 @Module({
   imports: [
-    // 1. Conexión a la base de datos exclusiva del Submission Service en el contenedor unificado
+    // 1. Conexión a POSTGRESQL (Dinámica)
     TypeOrmModule.forRoot({
       type: 'postgres',
-      host: 'localhost',
-      port: 5432, // 👈 Puerto centralizado
-      username: 'postgres', // 👈 Credenciales unificadas
-      password: 'password',
-      database: 'fica_judge_submissions', // 👈 Base de datos lógica aislada
+      host: process.env.DB_HOST || 'localhost',
+      port: parseInt(process.env.DB_PORT || '5432', 10),
+      username: process.env.DB_USERNAME || 'postgres',
+      password: process.env.DB_PASSWORD || 'password',
+      database: process.env.DB_NAME || 'fica_judge_submissions',
       entities: [Submission],
       synchronize: true, 
+      ssl: process.env.DB_HOST ? { rejectUnauthorized: false } : false,
     }),
 
     // 2. Registramos la Entidad
     TypeOrmModule.forFeature([Submission]),
 
-    // 3. Conexión a MONGODB (Para leer los casos de prueba secretos)
-    MongooseModule.forRoot('mongodb://mongo_admin:mongo_secret@localhost:27017/problem_db?authSource=admin'),
+    // 3. Conexión a MONGODB (Dinámica)
+    MongooseModule.forRoot(
+      process.env.MONGO_URI || 'mongodb://mongo_admin:mongo_secret@localhost:27017/problem_db?authSource=admin'
+    ),
     MongooseModule.forFeature([{ name: Problem.name, schema: ProblemSchema }]),
 
-    // 4. Conexión a RabbitMQ
+    // 4. Conexión a RABBITMQ (Dinámica)
     ClientsModule.register([
       {
         name: 'RABBITMQ_CLIENT', 
         transport: Transport.RMQ,
         options: {
-          urls: ['amqp://admin:admin123@localhost:5672'],
+          urls: [process.env.RABBITMQ_URL || 'amqp://admin:admin123@localhost:5672'],
           queue: 'submissions_queue',
           queueOptions: {
             durable: true,
@@ -46,7 +49,7 @@ import { Problem, ProblemSchema } from './schemas/problem.schema';
         name: 'RANKING_CLIENT', 
         transport: Transport.RMQ,
         options: {
-          urls: ['amqp://admin:admin123@localhost:5672'],
+          urls: [process.env.RABBITMQ_URL || 'amqp://admin:admin123@localhost:5672'],
           queue: 'ranking_queue',
           queueOptions: {
             durable: false,
