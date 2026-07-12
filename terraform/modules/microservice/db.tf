@@ -24,7 +24,7 @@ resource "aws_security_group" "db_sg" {
     security_groups = [var.app_sg_id]
   }
   
-  # MongoDB (DocumentDB o EC2 dedicada)
+  # MongoDB (Docker en EC2)
   ingress {
     from_port       = 27017
     to_port         = 27017
@@ -40,7 +40,7 @@ resource "aws_security_group" "db_sg" {
     security_groups = [var.app_sg_id]
   }
 
-  # RabbitMQ (AMQP)
+  # RabbitMQ (Docker en EC2)
   ingress {
     from_port       = 5672
     to_port         = 5672
@@ -62,7 +62,7 @@ resource "aws_db_instance" "microservice_db" {
   identifier             = "fica-${var.service_name}-db-${var.environment}"
   engine                 = "postgres"
   engine_version         = "15"
-  instance_class         = "db.t3.micro" # Capa económica
+  instance_class         = "db.t3.micro"
   allocated_storage      = 20
   db_name                = var.db_name
   username               = var.db_username
@@ -72,28 +72,7 @@ resource "aws_db_instance" "microservice_db" {
   skip_final_snapshot    = true
 }
 
-# 4. AMAZON DOCUMENTDB (MOCK MONGO)
-# Nota: DocumentDB suele demorar en levantar. Si buscas máxima velocidad de despliegue,
-# puedes sustituirlo por una EC2 t3.micro dedicada con Docker ejecutando Mongo oficial.
-resource "aws_docdb_cluster" "mongo" {
-  count               = var.requires_mongo ? 1 : 0
-  cluster_identifier  = "fica-${var.service_name}-mongo-${var.environment}"
-  engine              = "docdb"
-  master_username     = var.db_username
-  master_password     = var.db_password
-  skip_final_snapshot = true
-  db_subnet_group_name   = aws_db_subnet_group.db_subnet_group.name
-  vpc_security_group_ids = [aws_security_group.db_sg.id]
-}
-
-resource "aws_docdb_cluster_instance" "mongo_instance" {
-  count              = var.requires_mongo ? 1 : 0
-  identifier         = "fica-${var.service_name}-mongo-inst-${var.environment}"
-  cluster_identifier = aws_docdb_cluster.mongo[0].id
-  instance_class     = "db.t3.medium" # Mínimo aceptado por DocumentDB
-}
-
-# 5. AMAZON ELASTICACHE (REDIS)
+# 4. AMAZON ELASTICACHE (REDIS)
 resource "aws_elasticache_cluster" "redis" {
   count                = var.requires_redis ? 1 : 0
   cluster_id           = "fica-${var.service_name}-redis-${var.environment}"
@@ -104,20 +83,4 @@ resource "aws_elasticache_cluster" "redis" {
   port                 = 6379
   subnet_group_name    = aws_elasticache_subnet_group.redis_subnet[0].name
   security_group_ids   = [aws_security_group.db_sg.id]
-}
-
-# 6. AMAZON MQ (RABBITMQ)
-resource "aws_mq_broker" "rabbitmq" {
-  count              = var.requires_rabbitmq ? 1 : 0
-  broker_name        = "fica-${var.service_name}-rabbitmq-${var.environment}"
-  engine_type        = "RabbitMQ"
-  engine_version     = "3.10.8"
-  host_instance_type = "mq.t3.micro" # Muy económico para pruebas
-  security_groups    = [aws_security_group.db_sg.id]
-  subnet_ids         = [var.subnet_ids[0]] # Despliegue en subnet única para QA
-
-  user {
-    username = var.db_username
-    password = var.db_password
-  }
 }

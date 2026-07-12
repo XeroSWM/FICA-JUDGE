@@ -35,9 +35,9 @@ module "api_gateway" {
   requires_redis    = false
   requires_rabbitmq = false
   
-  db_name       = var.db_name
-  db_username   = var.db_username
-  db_password   = var.db_password
+  db_name     = var.db_name
+  db_username = var.db_username
+  db_password = var.db_password
 }
 
 # =================================================================
@@ -63,9 +63,9 @@ module "iam_service" {
   requires_redis    = true
   requires_rabbitmq = false
   
-  db_name       = var.db_name
-  db_username   = var.db_username
-  db_password   = var.db_password
+  db_name     = var.db_name
+  db_username = var.db_username
+  db_password = var.db_password
 }
 
 # =================================================================
@@ -91,9 +91,9 @@ module "catalog_service" {
   requires_redis    = false
   requires_rabbitmq = false
   
-  db_name       = "ficacatalog_qa"
-  db_username   = var.db_username
-  db_password   = var.db_password
+  db_name     = "ficacatalog_qa"
+  db_username = var.db_username
+  db_password = var.db_password
 }
 
 # =================================================================
@@ -119,9 +119,9 @@ module "ranking_service" {
   requires_redis    = true
   requires_rabbitmq = false
   
-  db_name       = var.db_name
-  db_username   = var.db_username
-  db_password   = var.db_password
+  db_name     = var.db_name
+  db_username = var.db_username
+  db_password = var.db_password
 }
 
 # =================================================================
@@ -147,9 +147,9 @@ module "submission_service" {
   requires_redis    = false
   requires_rabbitmq = true
   
-  db_name       = var.db_name
-  db_username   = var.db_username
-  db_password   = var.db_password
+  db_name     = var.db_name
+  db_username = var.db_username
+  db_password = var.db_password
 }
 
 # =================================================================
@@ -175,9 +175,38 @@ module "assignment_service" {
   requires_redis    = false
   requires_rabbitmq = false
   
-  db_name       = var.db_name
-  db_username   = var.db_username
-  db_password   = var.db_password
+  db_name     = var.db_name
+  db_username = var.db_username
+  db_password = var.db_password
+}
+
+# =================================================================
+# 7. FRONTEND SERVICE (React + Nginx)
+# =================================================================
+module "frontend_service" {
+  source = "../../modules/microservice"
+
+  service_name  = "frontend"
+  environment   = "qa"
+  vpc_id        = aws_vpc.fica_vpc.id
+  subnet_ids    = [aws_subnet.fica_subnet_a.id, aws_subnet.fica_subnet_b.id]
+  app_sg_id     = aws_security_group.fica_sg.id
+  ami_id        = data.aws_ami.ubuntu.id
+  instance_type = var.instance_type
+
+  app_port      = 80
+  docker_image  = "xxavyx38/fica-frontend:latest"
+  
+  # El frontend solo sirve estáticos, no necesita bases de datos
+  requires_rds      = false
+  requires_mongo    = false
+  requires_redis    = false
+  requires_rabbitmq = false
+  
+  # Llenamos las variables obligatorias del módulo con texto dummy
+  db_name     = "none"
+  db_username = "none"
+  db_password = "none"
 }
 
 # =================================================================
@@ -211,4 +240,9 @@ output "submission_api_url" {
 output "assignment_api_url" {
   description = "URL del Servicio de Evaluaciones (Assignments)"
   value       = module.assignment_service.service_url
+}
+
+output "frontend_url_definitiva" {
+  description = "URL publica de la aplicacion React (Tu nueva puerta de entrada)"
+  value       = module.frontend_service.service_url
 }

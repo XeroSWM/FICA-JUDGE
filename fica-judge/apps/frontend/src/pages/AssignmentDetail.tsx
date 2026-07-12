@@ -7,7 +7,7 @@ const AssignmentDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [assignment, setAssignment] = useState<any>(null);
-  const [currentProblemIndex, setCurrentProblemIndex] = useState(0);
+  const [currentProblemIndex] = useState(0);
   const [sourceCode, setSourceCode] = useState('');
   const [output, setOutput] = useState('Esperando ejecución...\nPara probar tu código, presiona "Ejecutar Código".');
   const [isSubmitting, setIsSubmitting] = useState(false);

@@ -46,17 +46,32 @@ resource "aws_launch_template" "lt" {
               systemctl start docker
               systemctl enable docker
               
-              # Correr el contenedor mapeando todas las conexiones nativas de AWS
+              export RABBITMQ_URL=""
+              export MONGO_URI=""
+              
+              # Levantar RabbitMQ localmente si se requiere
+              if [ "${var.requires_rabbitmq}" == "true" ]; then
+                docker run -d -p 5672:5672 -p 15672:15672 --name fica-rabbitmq --restart unless-stopped rabbitmq:3-management
+                export RABBITMQ_URL="amqp://guest:guest@172.17.0.1:5672"
+              fi
+
+              # Levantar MongoDB localmente si se requiere
+              if [ "${var.requires_mongo}" == "true" ]; then
+                docker run -d -p 27017:27017 -e MONGO_INITDB_ROOT_USERNAME="${var.db_username}" -e MONGO_INITDB_ROOT_PASSWORD="${var.db_password}" --name fica-mongodb --restart unless-stopped mongo:latest
+                export MONGO_URI="mongodb://${var.db_username}:${var.db_password}@172.17.0.1:27017/${var.db_name}?authSource=admin"
+              fi
+              
+              # Correr el contenedor de Node mapeando las conexiones dinámicamente
               docker run -d -p ${var.app_port}:${var.app_port} --name fica-${var.service_name}-service --restart unless-stopped \
                 -e DB_HOST="${try(aws_db_instance.microservice_db[0].address, "")}" \
                 -e DB_PORT=5432 \
                 -e DB_USERNAME="${var.db_username}" \
                 -e DB_PASSWORD="${var.db_password}" \
                 -e DB_NAME="${var.db_name}" \
-                -e MONGO_URI="${try("mongodb://${var.db_username}:${var.db_password}@${aws_docdb_cluster.mongo[0].endpoint}:27017/${var.db_name}?replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false", "")}" \
+                -e MONGO_URI="$MONGO_URI" \
                 -e REDIS_HOST="${try(aws_elasticache_cluster.redis[0].cache_nodes[0].address, "")}" \
                 -e REDIS_PORT=6379 \
-                -e RABBITMQ_URL="${try(aws_mq_broker.rabbitmq[0].instances[0].endpoints[0], "")}" \
+                -e RABBITMQ_URL="$RABBITMQ_URL" \
                 -e PORT=${var.app_port} \
                 ${var.docker_image}
               EOF
