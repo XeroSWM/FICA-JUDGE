@@ -18,7 +18,16 @@ export class SubmissionServiceService {
     @InjectRepository(Submission) private readonly submissionRepository: Repository<Submission>,
     @InjectModel(Problem.name) private readonly problemModel: Model<Problem>, 
   ) {
-    this.docker = new Docker({ host: '127.0.0.1', port: 2375 });
+    // 💻 DETECCIÓN DINÁMICA DE ENTORNO
+    const isWindows = process.platform === 'win32';
+
+    if (isWindows) {
+      console.log('💻 Entorno local (Windows) detectado. Conectando a Docker por puerto TCP 2375...');
+      this.docker = new Docker({ host: '127.0.0.1', port: 2375 });
+    } else {
+      console.log('☁️ Entorno de producción (AWS/Linux) detectado. Conectando a Docker por Socket...');
+      this.docker = new Docker({ socketPath: '/var/run/docker.sock' });
+    }
   }
 
   async processNewSubmission(payload: any) {
