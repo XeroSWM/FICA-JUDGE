@@ -50,24 +50,36 @@ resource "aws_launch_template" "lt" {
               systemctl start docker
               systemctl enable docker
               
+              # Esperar 10 segundos a que el demonio de Docker se levante por completo
+              sleep 10
+
               # Levantar RabbitMQ localmente si se requiere
               if [ "${var.requires_rabbitmq}" == "true" ]; then
                 docker run -d -p 5672:5672 -p 15672:15672 --name fica-rabbitmq --restart unless-stopped rabbitmq:3-management
               fi
 
-              # Levantar MongoDB localmente si se requiere
-              if [ "${var.requires_mongo}" == "true" ]; then
-                docker run -d -p 27017:27017 -e MONGO_INITDB_ROOT_USERNAME="${var.db_username}" -e MONGO_INITDB_ROOT_PASSWORD="${var.db_password}" --name fica-mongodb --restart unless-stopped mongo:latest
+              # AUTOMATIZACIÓN: Crear imagen local de Python para el evaluador si es el servicio de entregas (submission)
+              if [ "${var.service_name}" == "submission" ]; then
+                mkdir -p /tmp/py-compiler
+                cat <<'OUTER_EOF' > /tmp/py-compiler/Dockerfile
+              FROM python:3.9-slim
+              CMD ["python3"]
+              OUTER_EOF
+                
+                # Construir la imagen localmente asegurando que Docker ya responda
+                docker build -t fica-comp-python.v2:latest /tmp/py-compiler/
               fi
               
               # Correr el contenedor de Node mapeando las conexiones dinámicamente desde Terraform
               docker run -d -p ${var.app_port}:${var.app_port} --name fica-${var.service_name}-service --restart unless-stopped \
+                -v /var/run/docker.sock:/var/run/docker.sock \
+                -v /tmp:/tmp \
                 -e DB_HOST="${try(aws_db_instance.microservice_db[0].address, "")}" \
                 -e DB_PORT=5432 \
                 -e DB_USERNAME="${var.db_username}" \
                 -e DB_PASSWORD="${var.db_password}" \
                 -e DB_NAME="${var.db_name}" \
-                -e MONGO_URI="${var.requires_mongo ? "mongodb://${var.db_username}:${var.db_password}@172.17.0.1:27017/${var.db_name}?authSource=admin" : ""}" \
+                -e MONGO_URI="${var.external_mongo_uri != "" ? var.external_mongo_uri : (var.requires_mongo ? "mongodb://${var.db_username}:${var.db_password}@172.17.0.1:27017/${var.db_name}?authSource=admin" : "")}" \
                 -e REDIS_HOST="${try(aws_elasticache_cluster.redis[0].cache_nodes[0].address, "")}" \
                 -e REDIS_PORT=6379 \
                 -e RABBITMQ_URL="${var.requires_rabbitmq ? "amqp://guest:guest@172.17.0.1:5672" : ""}" \

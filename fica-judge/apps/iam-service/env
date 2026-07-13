@@ -1,0 +1,27 @@
+# ==========================================
+# IAM SERVICE - CONFIGURACIÓN LOCAL (DOCKER)
+# ==========================================
+
+# Puerto donde corre el servicio IAM en Node/NestJS
+PORT=3001
+
+# ==========================================
+# POSTGRESQL (Mapeado con fica_postgres_shared)
+# ==========================================
+DB_HOST=localhost
+DB_PORT=5432
+DB_USERNAME=postgres
+DB_PASSWORD=password
+DB_NAME=fica_judge_iam
+
+# ==========================================
+# REDIS (Mapeado con fica_session_db)
+# ==========================================
+REDIS_HOST=localhost
+REDIS_PORT=6379
+
+# ==========================================
+# SEGURIDAD (JWT)
+# ==========================================
+JWT_SECRET=super_secreto_local_para_desarrollo_fica_123
+JWT_EXPIRATION=86400s

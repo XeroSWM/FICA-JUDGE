@@ -23,3 +23,4 @@ variable "db_password" {
   default     = "FicaJudge2026QA" 
   sensitive   = true
 }
+
