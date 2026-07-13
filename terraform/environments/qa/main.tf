@@ -12,6 +12,11 @@ data "aws_ami" "ubuntu" {
   }
 }
 
+# Variable local para almacenar la URI segura de MongoDB Atlas
+locals {
+  mongo_atlas_uri = "mongodb+srv://fica-judge:Shokugeki200219@fica-judge.vopfu2z.mongodb.net/fica-judge?retryWrites=true&w=majority&appName=fica-judge"
+}
+
 # =================================================================
 # 1. API GATEWAY (Enrutador Principal)
 # =================================================================
@@ -29,14 +34,12 @@ module "api_gateway" {
   app_port      = 3000
   docker_image  = "xxavyx38/api-gateway:latest"
   
-  # 👇 INYECCIÓN DINÁMICA DE RUTAS 👇
   iam_service_url        = "http://${module.iam_service.service_url}/auth"
   catalog_service_url    = "http://${module.catalog_service.service_url}/problems"
   submission_service_url = "http://${module.submission_service.service_url}/submissions"
   ranking_service_url    = "http://${module.ranking_service.service_url}/ranking"
   assignment_service_url = "http://${module.assignment_service.service_url}/assignments"
   
-  # El Gateway solo enruta, no necesita BD propia
   requires_rds      = false
   requires_mongo    = false
   requires_redis    = false
@@ -64,7 +67,6 @@ module "iam_service" {
   app_port      = 3001
   docker_image  = "xxavyx38/iam-service:latest"
   
-  # Requiere Postgres (Usuarios) y Redis (Sesiones JWT)
   requires_rds      = true
   requires_mongo    = false
   requires_redis    = true
@@ -92,13 +94,14 @@ module "catalog_service" {
   app_port      = 3002
   docker_image  = "xxavyx38/problem-catalog-service:latest"
   
-  # Requiere Mongo (JSONs de problemas y casos de prueba)
   requires_rds      = false
-  requires_mongo    = true
+  requires_mongo    = false # 👈 Desactivado local, usará Atlas
   requires_redis    = false
   requires_rabbitmq = false
+
+  # Inyectamos directamente la URI de Atlas mediante una variable de entorno de tu Docker
+  external_mongo_uri = local.mongo_atlas_uri
   
-  # 👇 EL CAMBIO: Unificamos la base de datos con var.db_name
   db_name     = var.db_name
   db_username = var.db_username
   db_password = var.db_password
@@ -121,7 +124,6 @@ module "ranking_service" {
   app_port      = 3004
   docker_image  = "xxavyx38/ranking-service:latest"
   
-  # Requiere Postgres (Historial) y Redis (Leaderboard en tiempo real)
   requires_rds      = true
   requires_mongo    = false
   requires_redis    = true
@@ -149,11 +151,13 @@ module "submission_service" {
   app_port      = 3003
   docker_image  = "xxavyx38/submission-service:latest"
   
-  # Requiere Postgres (Historial de envíos) y RabbitMQ (Cola para Docker)
   requires_rds      = true
-  requires_mongo    = true
+  requires_mongo    = false # 👈 Desactivado local, usará Atlas
   requires_redis    = false
   requires_rabbitmq = true
+
+  # Apuntamos exactamente al mismo cluster de Atlas de arriba
+  external_mongo_uri = local.mongo_atlas_uri
   
   db_name     = var.db_name
   db_username = var.db_username
@@ -177,7 +181,6 @@ module "assignment_service" {
   app_port      = 3005
   docker_image  = "xxavyx38/assignment-service:latest"
   
-  # Requiere Postgres (Gestión de fechas, notas y reglas del examen)
   requires_rds      = true
   requires_mongo    = false
   requires_redis    = false
@@ -205,13 +208,11 @@ module "frontend_service" {
   app_port      = 80
   docker_image  = "xxavyx38/fica-frontend:latest"
   
-  # El frontend solo sirve estáticos, no necesita bases de datos
   requires_rds      = false
   requires_mongo    = false
   requires_redis    = false
   requires_rabbitmq = false
   
-  # Llenamos las variables obligatorias del módulo con texto dummy
   db_name     = "none"
   db_username = "none"
   db_password = "none"

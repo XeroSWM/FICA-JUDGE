@@ -70,3 +70,9 @@ variable "requires_rabbitmq" {
   type        = bool
   default     = false
 }
+
+variable "external_mongo_uri" {
+  type        = string
+  description = "URI centralizada externa para MongoDB Atlas"
+  default     = ""
+}
